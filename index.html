@@ -3,108 +3,385 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tic-Tac-Toe Battle Hub</title>
+    <title>Tic-Tac-Toe Pro | FMK</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;900&display=swap');
         
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #020617;
+            font-family: 'Poppins', sans-serif;
+            background: radial-gradient(circle at top, #1e293b, #020617);
             color: white;
+            height: 100vh;
             overflow: hidden;
-            user-select: none;
             touch-action: manipulation;
         }
 
-        .glass {
+        .neo-glass {
             background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(10px);
+            backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         }
 
-        .cell {
-            background: #0f172a;
-            box-shadow: 0 6px 0 #000;
-            transition: all 0.1s;
+        .tic-cell {
+            background: rgba(15, 23, 42, 0.8);
+            border-bottom: 5px solid #000;
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .cell:active {
-            box-shadow: 0 0px 0 #000;
+        .tic-cell:active {
+            border-bottom-width: 0;
             transform: translateY(4px);
+        }
+
+        .x-text {
+            color: #6366f1;
+            text-shadow: 0 0 15px rgba(99, 102, 241, 0.8);
+        }
+
+        .o-text {
+            color: #ec4899;
+            text-shadow: 0 0 15px rgba(236, 72, 153, 0.8);
         }
 
         .screen {
             display: none;
-            animation: fadeIn 0.4s ease-out;
+            width: 100%;
+            max-width: 400px;
+            flex-direction: column;
+            animation: slideUp 0.5s ease-out;
         }
 
         .screen.active {
             display: flex;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        .bolt-glow {
-            filter: drop-shadow(0 0 15px rgba(99, 102, 241, 0.8));
-            animation: pulse 1.5s infinite ease-in-out;
+        .loader {
+            width: 48px;
+            height: 48px;
+            border: 5px solid #FFF;
+            border-bottom-color: #6366f1;
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
         }
 
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.15); opacity: 0.8; }
+        @keyframes rotation {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-6">
+<body class="flex items-center justify-center p-4">
 
     <!-- SPLASH SCREEN -->
-    <div id="splash-screen" class="screen active fixed inset-0 flex-col items-center justify-center bg-slate-950 z-[100]">
-        <div class="bolt-glow mb-6">
-            <svg width="100" height="100" viewBox="0 0 24 24" fill="#6366f1" stroke="#6366f1" stroke-width="1"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+    <div id="splash" class="screen active items-center text-center">
+        <div class="mb-8 relative">
+            <div class="w-24 h-24 bg-indigo-600/20 rounded-3xl rotate-12 absolute animate-pulse"></div>
+            <svg class="relative z-10" width="96" height="96" viewBox="0 0 24 24" fill="#6366f1"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
         </div>
-        <h1 class="text-4xl font-black italic tracking-tighter text-white">FMK GAMES</h1>
-        <p class="text-[10px] text-indigo-500 font-bold tracking-[0.4em] uppercase mt-4">Initializing Battle...</p>
+        <h1 class="text-4xl font-black tracking-tighter italic">FMK GAMES</h1>
+        <div class="mt-12 loader"></div>
     </div>
 
-    <!-- HOME SCREEN -->
-    <div id="home-screen" class="screen w-full max-w-sm flex-col gap-10">
+    <!-- MAIN MENU -->
+    <div id="menu" class="screen gap-8">
         <div class="text-center">
-            <h1 class="text-5xl font-black italic tracking-tighter">BATTLE HUB</h1>
-            <p class="text-[10px] text-indigo-500 font-bold tracking-[0.5em] uppercase">Connect & Play</p>
+            <h1 class="text-5xl font-black italic tracking-tighter mb-2">BATTLE HUB</h1>
+            <p class="text-xs font-bold text-indigo-400 tracking-[0.3em] uppercase">Multiplayer Edition</p>
         </div>
 
-        <div class="space-y-4">
-            <button onclick="startLocal()" class="w-full p-6 glass rounded-[2.5rem] flex items-center gap-4 text-left hover:bg-white/5 transition-all">
-                <div class="p-3 bg-indigo-500/20 rounded-2xl text-indigo-400">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        <div class="flex flex-col gap-4">
+            <button onclick="startLocal()" class="neo-glass p-6 rounded-[2rem] flex items-center gap-5 hover:bg-white/5 transition-all group">
+                <div class="w-14 h-14 rounded-2xl bg-indigo-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                 </div>
-                <div>
-                    <p class="font-black text-xl">Local 1v1</p>
-                    <p class="text-[10px] text-slate-500 font-bold uppercase">Offline Match</p>
+                <div class="text-left">
+                    <h3 class="font-bold text-lg">Local Play</h3>
+                    <p class="text-[10px] text-slate-500 font-bold uppercase">ഒരാൾക്കൊപ്പം കളിക്കാം</p>
                 </div>
             </button>
 
-            <button onclick="showLobby()" class="w-full p-6 bg-indigo-600 border border-indigo-400 rounded-[2.5rem] flex items-center gap-4 shadow-xl shadow-indigo-600/30 active:scale-95 transition-all">
-                <div class="p-3 bg-white/20 rounded-2xl text-white">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
+            <button onclick="switchScreen('lobby')" class="bg-indigo-600 p-6 rounded-[2rem] flex items-center gap-5 shadow-lg shadow-indigo-600/30 active:scale-95 transition-all">
+                <div class="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
                 </div>
-                <div>
-                    <p class="font-black text-xl">Hotspot Room</p>
-                    <p class="text-[10px] text-indigo-200 font-bold uppercase">Multiplayer Connect</p>
+                <div class="text-left">
+                    <h3 class="font-bold text-lg text-white">Online Room</h3>
+                    <p class="text-[10px] text-indigo-200 font-bold uppercase">ദൂരെയുള്ള കൂട്ടുകാരനൊപ്പം</p>
                 </div>
             </button>
         </div>
     </div>
 
-    <!-- LOBBY SCREEN -->
-    <div id="lobby-screen" class="screen w-full max-w-sm flex-col gap-6">
+    <!-- LOBBY -->
+    <div id="lobby" class="screen gap-6">
+        <div class="flex items-center gap-4">
+            <button onclick="switchScreen('menu')" class="p-3 neo-glass rounded-2xl text-slate-400">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            </button>
+            <h2 class="text-2xl font-black italic uppercase">Lobby</h2>
+        </div>
+
+        <div class="neo-glass p-8 rounded-[2.5rem] space-y-8">
+            <button onclick="createRoom()" class="w-full py-5 bg-indigo-600 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-indigo-600/20 active:scale-95 transition-all">Host Room</button>
+            
+            <div class="relative flex items-center">
+                <div class="flex-grow border-t border-white/10"></div>
+                <span class="flex-shrink mx-4 text-[10px] font-bold text-slate-500 uppercase">Or Join</span>
+                <div class="flex-grow border-t border-white/10"></div>
+            </div>
+
+            <div class="flex gap-2">
+                <input id="join-input" type="number" placeholder="Enter ID" class="flex-1 bg-black/40 border border-white/10 rounded-2xl px-5 font-bold outline-none focus:border-indigo-500 h-14">
+                <button onclick="joinRoom()" class="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center hover:bg-white/20 transition-colors">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- WAITING -->
+    <div id="waiting" class="screen items-center text-center gap-8">
+        <div class="loader"></div>
+        <div class="neo-glass p-10 rounded-[3rem] border-indigo-500/30">
+            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Room Code</p>
+            <h2 id="room-code" class="text-6xl font-black tracking-widest font-mono">----</h2>
+        </div>
+        <p class="text-sm text-slate-400 max-w-[200px]">ഈ ഐഡി കൂട്ടുകാരന് അയച്ചു കൊടുക്കുക</p>
+        <button onclick="switchScreen('menu')" class="text-slate-500 font-bold uppercase text-xs tracking-[0.2em] underline">Cancel</button>
+    </div>
+
+    <!-- GAME -->
+    <div id="game" class="screen gap-6">
+        <div class="flex justify-between items-center neo-glass p-4 rounded-3xl">
+            <div class="flex flex-col">
+                <p id="turn-text" class="text-[10px] font-black x-text uppercase tracking-widest">Player X Turn</p>
+                <p id="room-id-tag" class="text-[8px] font-bold text-slate-500 uppercase">Local Match</p>
+            </div>
+            <button onclick="resetGame()" class="p-3 bg-white/5 rounded-2xl text-slate-400">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            </button>
+        </div>
+
+        <div id="board" class="neo-glass p-4 rounded-[3rem] aspect-square grid grid-cols-3 gap-3">
+            <!-- Board cells here -->
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+            <div class="neo-glass py-4 rounded-2xl text-center">
+                <p class="text-[9px] font-bold text-slate-500 uppercase mb-1">X Score</p>
+                <p id="score-x" class="text-2xl font-black x-text">0</p>
+            </div>
+            <div class="neo-glass py-4 rounded-2xl text-center">
+                <p class="text-[9px] font-bold text-slate-500 uppercase mb-1">Draw</p>
+                <p id="score-draws" class="text-2xl font-black">0</p>
+            </div>
+            <div class="neo-glass py-4 rounded-2xl text-center">
+                <p class="text-[9px] font-bold text-slate-500 uppercase mb-1">O Score</p>
+                <p id="score-o" class="text-2xl font-black o-text">0</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Firebase Core ---
+        const config = JSON.parse(__firebase_config);
+        firebase.initializeApp(config);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'fmk-pro-tac';
+
+        let user = null;
+        let gameMode = 'local';
+        let currentRoom = null;
+        let boardState = Array(9).fill(null);
+        let turn = 'X';
+        let winner = null;
+        let scores = { X: 0, O: 0, draw: 0 };
+        let unsubscribe = null;
+
+        // --- Init ---
+        async function startApp() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await auth.signInWithCustomToken(__initial_auth_token);
+                } else {
+                    await auth.signInAnonymously();
+                }
+                user = auth.currentUser;
+                setTimeout(() => switchScreen('menu'), 2500);
+            } catch (err) { console.error(err); }
+        }
+
+        function switchScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            if(id === 'menu' && unsubscribe) unsubscribe();
+        }
+
+        // --- Board Logic ---
+        function renderBoard() {
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+            boardState.forEach((cell, i) => {
+                const btn = document.createElement('button');
+                btn.className = 'tic-cell rounded-[1.8rem] flex items-center justify-center text-5xl font-black';
+                if (cell === 'X') btn.innerHTML = '<span class="x-text">X</span>';
+                if (cell === 'O') btn.innerHTML = '<span class="o-text">O</span>';
+                btn.onclick = () => makeMove(i);
+                board.appendChild(btn);
+            });
+            updateStatus();
+        }
+
+        function updateStatus() {
+            const status = document.getElementById('turn-text');
+            if (winner) {
+                status.innerText = winner === 'draw' ? ' സമനില !' : winner + ' ജയിച്ചു !';
+                status.className = `text-[10px] font-black uppercase tracking-widest ${winner === 'X' ? 'x-text' : winner === 'O' ? 'o-text' : 'text-white'}`;
+            } else {
+                status.innerText = `Player ${turn} Turn`;
+                status.className = `text-[10px] font-black uppercase tracking-widest ${turn === 'X' ? 'x-text' : 'o-text'}`;
+            }
+        }
+
+        async function makeMove(i) {
+            if (boardState[i] || winner) return;
+
+            if (gameMode === 'online') {
+                const snap = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(currentRoom).get();
+                const data = snap.data();
+                const myMark = data.players.X === user.uid ? 'X' : 'O';
+                if (data.turn !== myMark || data.status !== 'playing') return;
+            }
+
+            boardState[i] = turn;
+            const win = checkWin(boardState);
+            const nextTurn = turn === 'X' ? 'O' : 'X';
+
+            if (gameMode === 'online') {
+                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(currentRoom).update({
+                    board: boardState,
+                    turn: nextTurn,
+                    winner: win
+                });
+            } else {
+                turn = nextTurn;
+                winner = win;
+                if(winner) updateScores(winner);
+                renderBoard();
+            }
+        }
+
+        function checkWin(b) {
+            const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+            for (let [a,b1,c] of lines) {
+                if (b[a] && b[a] === b[b1] && b[a] === b[c]) return b[a];
+            }
+            return b.every(v => v) ? 'draw' : null;
+        }
+
+        function updateScores(w) {
+            scores[w]++;
+            document.getElementById('score-x').innerText = scores.X;
+            document.getElementById('score-o').innerText = scores.O;
+            document.getElementById('score-draws').innerText = scores.draw;
+        }
+
+        function resetGame() {
+            boardState = Array(9).fill(null);
+            turn = 'X';
+            winner = null;
+            if (gameMode === 'online') {
+                db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(currentRoom).update({
+                    board: boardState, turn: 'X', winner: null
+                });
+            } else {
+                renderBoard();
+            }
+        }
+
+        // --- Online Logic ---
+        function startLocal() {
+            gameMode = 'local';
+            currentRoom = null;
+            boardState = Array(9).fill(null);
+            turn = 'X';
+            winner = null;
+            document.getElementById('room-id-tag').innerText = 'Local Match';
+            renderBoard();
+            switchScreen('game');
+        }
+
+        async function createRoom() {
+            gameMode = 'online';
+            const rid = Math.floor(1000 + Math.random() * 9000).toString();
+            currentRoom = rid;
+            document.getElementById('room-code').innerText = rid;
+            document.getElementById('room-id-tag').innerText = 'Room: ' + rid;
+            
+            await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(rid).set({
+                board: Array(9).fill(null),
+                turn: 'X',
+                winner: null,
+                players: { X: user.uid, O: null },
+                status: 'waiting'
+            });
+            
+            switchScreen('waiting');
+            listenRoom(rid);
+        }
+
+        async function joinRoom() {
+            const rid = document.getElementById('join-input').value;
+            if(!rid) return;
+            const ref = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(rid);
+            const snap = await ref.get();
+            if(snap.exists() && !snap.data().players.O) {
+                gameMode = 'online';
+                currentRoom = rid;
+                document.getElementById('room-id-tag').innerText = 'Room: ' + rid;
+                await ref.update({ 'players.O': user.uid, status: 'playing' });
+                switchScreen('game');
+                listenRoom(rid);
+            }
+        }
+
+        function listenRoom(rid) {
+            if (unsubscribe) unsubscribe();
+            unsubscribe = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(rid)
+                .onSnapshot(snap => {
+                    if(!snap.exists()) return;
+                    const data = snap.data();
+                    boardState = data.board;
+                    turn = data.turn;
+                    const oldWin = winner;
+                    winner = data.winner;
+                    if(winner && winner !== oldWin) updateScores(winner);
+
+                    if(data.status === 'playing' && document.getElementById('waiting').classList.contains('active')) {
+                        switchScreen('game');
+                    }
+                    renderBoard();
+                });
+        }
+
+        window.onload = startApp;
+    </script>
+</body>
+</html>
+
         <button onclick="showHome()" class="p-2 text-slate-500"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
         <div class="glass p-8 rounded-[2.5rem] space-y-8">
             <h2 class="text-2xl font-black italic uppercase">Lobby</h2>
