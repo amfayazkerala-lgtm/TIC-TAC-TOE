@@ -1,500 +1,348 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tic-Tac-Toe Pro | FMK Developer</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&family=Orbitron:wght@700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --primary: #6366f1;
-            --secondary: #ec4899;
-            --bg: #020617;
+import React, { useState, useEffect } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, collection, deleteDoc } from 'firebase/firestore';
+import { Trophy, Settings, Bell, Copy, Search, ArrowLeft, RefreshCw, X, Circle, Wifi, Share2 } from 'lucide-react';
+
+// --- Firebase Configuration ---
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'tictactoe-fmk';
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [screen, setScreen] = useState('home');
+  const [gameMode, setGameMode] = useState(null); // 'pvp', 'ai', 'online'
+  const [roomID, setRoomID] = useState('');
+  const [inputRoomID, setInputRoomID] = useState('');
+  const [gameState, setGameState] = useState({
+    board: Array(9).fill(null),
+    currentPlayer: 'X',
+    winner: null,
+    players: { X: null, O: null },
+    status: 'waiting'
+  });
+  const [scores, setScores] = useState({ X: 0, O: 0, draws: 0 });
+  const [settings, setSettings] = useState({ sfx: true, music: true, vibe: true });
+  const [showSettings, setShowSettings] = useState(false);
+
+  // --- Auth Initialization (Rule 3) ---
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
         }
+      } catch (err) {
+        console.error("Auth failed:", err);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
+    return () => unsubscribe();
+  }, []);
 
-        body {
-            font-family: 'Poppins', sans-serif;
-            background: var(--bg);
-            height: 100vh;
-            overflow: hidden;
-            color: white;
-            margin: 0;
-            perspective: 1000px;
-        }
+  // --- Real-time Game Sync (Online Only) ---
+  useEffect(() => {
+    if (!user || gameMode !== 'online' || !roomID) return;
 
-        /* --- UI COMPONENTS --- */
-        .glass {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        }
-
-        .btn-3d {
-            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            border-bottom: 4px solid rgba(0,0,0,0.3);
-        }
-
-        .btn-3d:active {
-            transform: scale(0.96) translateY(2px);
-            border-bottom-width: 0px;
-        }
-
-        .cell-3d {
-            background: rgba(15, 23, 42, 0.8);
-            border-bottom: 4px solid #000;
-            transition: all 0.1s;
-        }
-
-        .svg-x { stroke: var(--primary); stroke-width: 10; filter: drop-shadow(0 0 8px var(--primary)); }
-        .svg-o { stroke: var(--secondary); stroke-width: 10; filter: drop-shadow(0 0 8px var(--secondary)); }
-
-        .hidden-screen { display: none !important; }
+    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomID);
+    
+    const unsubscribe = onSnapshot(roomRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setGameState(data);
         
-        .click-anywhere {
-            position: absolute;
-            inset: 0;
-            z-index: 5;
-            cursor: pointer;
+        if (data.status === 'playing' && screen === 'searching') {
+          setScreen('game');
         }
+      } else if (screen === 'game') {
+        setScreen('home');
+      }
+    }, (error) => console.error("Firestore Error:", error));
 
-        /* Custom Toast */
-        #toast {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            transition: transform 0.3s ease;
+    return () => unsubscribe();
+  }, [user, gameMode, roomID, screen]);
+
+  // --- AI Logic (Auto Mode) ---
+  useEffect(() => {
+    if (gameMode === 'ai' && gameState.currentPlayer === 'O' && !gameState.winner) {
+      const timer = setTimeout(() => {
+        const avail = gameState.board.map((v, i) => v === null ? i : null).filter(v => v !== null);
+        if (avail.length > 0) {
+          const move = avail[Math.floor(Math.random() * avail.length)];
+          handleMove(move);
         }
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [gameState.currentPlayer, gameMode, gameState.winner, gameState.board]);
 
-        /* Toggle Switches */
-        .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #334155; transition: .4s; border-radius: 20px; }
-        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: var(--primary); }
-        input:checked + .slider:before { transform: translateX(20px); }
+  // --- Game Functions ---
+  const createRoom = async () => {
+    if (!user) return;
+    const newID = Math.floor(1000 + Math.random() * 9000).toString();
+    const initialData = {
+      board: Array(9).fill(null),
+      currentPlayer: 'X',
+      winner: null,
+      players: { X: user.uid, O: null },
+      status: 'waiting',
+      lastMove: Date.now()
+    };
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', newID), initialData);
+    setRoomID(newID);
+    setGameMode('online');
+    setScreen('searching');
+  };
 
-        @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 0.5; } 100% { transform: scale(1.3); opacity: 0; } }
-        .ring-animate::before { content: ''; position: absolute; inset: -10px; border: 2px solid var(--primary); border-radius: 50%; animation: pulse-ring 2s infinite; }
-    </style>
-</head>
-<body class="flex items-center justify-center p-4">
+  const joinRoom = async (id) => {
+    if (!user || !id) return;
+    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id);
+    const snap = await getDoc(roomRef);
+    
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data.players.O && data.players.O !== user.uid) {
+        return;
+      }
+      await updateDoc(roomRef, {
+        'players.O': user.uid,
+        status: 'playing'
+      });
+      setRoomID(id);
+      setGameMode('online');
+      setScreen('game');
+    }
+  };
 
-    <!-- HOME SCREEN -->
-    <div id="home-screen" class="w-full max-w-sm flex flex-col items-center gap-8 animate-in fade-in zoom-in duration-700">
-        <div class="w-full flex justify-between items-center px-2">
-            <button onclick="togglePanel('notif-panel')" class="w-10 h-10 glass rounded-full flex items-center justify-center text-slate-400">
-                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+  const checkWin = (b) => {
+    const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    for (let i = 0; i < lines.length; i++) {
+      const [a, b1, c] = lines[i];
+      if (b[a] && b[a] === b[b1] && b[a] === b[c]) return true;
+    }
+    return false;
+  };
+
+  const handleMove = async (index) => {
+    if (gameState.board[index] || gameState.winner) return;
+
+    if (gameMode === 'online') {
+      const mySymbol = gameState.players.X === user.uid ? 'X' : 'O';
+      if (gameState.currentPlayer !== mySymbol) return;
+    }
+
+    const newBoard = [...gameState.board];
+    newBoard[index] = gameState.currentPlayer;
+    const win = checkWin(newBoard);
+    const nextPlayer = gameState.currentPlayer === 'X' ? 'O' : 'X';
+
+    const updatedState = {
+      board: newBoard,
+      currentPlayer: nextPlayer,
+      winner: win ? gameState.currentPlayer : (newBoard.every(c => c) ? 'draw' : null)
+    };
+
+    if (gameMode === 'online') {
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomID), updatedState);
+    } else {
+      setGameState(prev => ({ ...prev, ...updatedState }));
+    }
+
+    if (settings.vibe && navigator.vibrate) navigator.vibrate(30);
+  };
+
+  const resetGame = async () => {
+    const reset = { board: Array(9).fill(null), currentPlayer: 'X', winner: null };
+    if (gameMode === 'online') {
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomID), reset);
+    } else {
+      setGameState(prev => ({ ...prev, ...reset }));
+    }
+  };
+
+  // Update scores when a winner is declared
+  useEffect(() => {
+    if (gameState.winner) {
+      if (gameState.winner === 'draw') {
+        setScores(s => ({ ...s, draws: s.draws + 1 }));
+      } else {
+        setScores(s => ({ ...s, [gameState.winner]: s[gameState.winner] + 1 }));
+      }
+    }
+  }, [gameState.winner]);
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6 select-none overflow-hidden font-sans">
+      {screen === 'home' && (
+        <div className="flex flex-col items-center gap-8 w-full max-w-sm animate-in fade-in zoom-in">
+          <div className="w-full flex justify-between">
+            <button className="p-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-full text-slate-400"><Bell size={20}/></button>
+            <button onClick={() => setShowSettings(true)} className="p-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-full text-slate-400"><Settings size={20}/></button>
+          </div>
+          <div className="text-center">
+            <h1 className="text-5xl font-black italic tracking-tighter text-white">TIC TAC TOE</h1>
+            <p className="text-[10px] font-bold text-indigo-400 tracking-[0.5em] uppercase">Connect & Play</p>
+          </div>
+          <div className="w-full space-y-4">
+            <button onClick={() => { setGameMode('pvp'); setScreen('game'); setGameState(p => ({...p, board: Array(9).fill(null), winner: null, status: 'playing'})); }} className="w-full py-5 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-between px-6 hover:bg-white/10 transition-colors">
+              <div className="flex items-center gap-4">
+                <X className="text-indigo-400" />
+                <div className="text-left">
+                  <span className="block font-bold">Local 1v1</span>
+                  <span className="text-[9px] text-slate-500 font-black uppercase">Offline with Friends</span>
+                </div>
+              </div>
+              <ArrowLeft className="rotate-180 text-slate-600" size={18} />
             </button>
-            <button onclick="togglePanel('settings-panel')" class="w-10 h-10 glass rounded-full flex items-center justify-center text-slate-400">
-                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            <button onClick={() => setScreen('lobby')} className="w-full py-5 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl flex items-center justify-between px-6">
+              <div className="flex items-center gap-4">
+                <Wifi className="text-indigo-400" />
+                <div className="text-left">
+                  <span className="block font-bold">Hotspot/Online</span>
+                  <span className="text-[9px] text-indigo-400 font-black uppercase">Host or Join Room</span>
+                </div>
+              </div>
+              <div className="bg-indigo-500 text-[8px] px-2 py-1 rounded font-black animate-pulse">LIVE</div>
             </button>
+            <button onClick={() => { setGameMode('ai'); setScreen('game'); setGameState(p => ({...p, board: Array(9).fill(null), winner: null, status: 'playing'})); }} className="w-full py-5 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-between px-6">
+              <div className="flex items-center gap-4">
+                <RefreshCw className="text-amber-400" />
+                <div className="text-left">
+                  <span className="block font-bold">Auto Mode (AI)</span>
+                  <span className="text-[9px] text-slate-500 font-black uppercase">Practice Solo</span>
+                </div>
+              </div>
+              <ArrowLeft className="rotate-180 text-slate-600" size={18} />
+            </button>
+          </div>
         </div>
+      )}
 
-        <div class="text-center">
-            <h1 class="text-4xl font-black italic tracking-tighter mb-1">TIC TAC TOE</h1>
-            <p class="text-[10px] font-bold text-indigo-400 tracking-[0.4em] uppercase">Premium Edition</p>
-        </div>
-
-        <div class="w-full space-y-4">
-            <!-- LOCAL MULTIPLAYER -->
-            <button onclick="navTo('game', 'pvp')" class="w-full py-5 glass btn-3d rounded-2xl flex items-center justify-between px-6 group">
-                <div class="flex items-center gap-4">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-                    <div class="text-left">
-                        <span class="block font-bold tracking-wide">Vs Friend (Local)</span>
-                        <span class="text-[9px] text-slate-500 uppercase font-black">Same Device 1v1</span>
-                    </div>
-                </div>
-                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
-            </button>
-
-            <!-- ONLINE ROOM -->
-            <button onclick="navTo('online-lobby')" class="w-full py-5 glass btn-3d rounded-2xl flex items-center justify-between px-6 bg-indigo-600/10 border-indigo-500/30">
-                <div class="flex items-center gap-4">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                    <div class="text-left">
-                        <span class="block font-bold tracking-wide">Play Online</span>
-                        <span class="text-[9px] text-indigo-400 uppercase font-black">Join or Create Room</span>
-                    </div>
-                </div>
-                <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center">
-                    <svg width="14" height="14" fill="white" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-                </div>
-            </button>
-
-            <!-- AI MODE -->
-            <button onclick="navTo('game', 'hard')" class="w-full py-5 glass btn-3d rounded-2xl flex items-center justify-between px-6">
-                <div class="flex items-center gap-4">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                    <div class="text-left">
-                        <span class="block font-bold tracking-wide text-amber-400">Auto Mode (AI)</span>
-                        <span class="text-[9px] text-slate-500 uppercase font-black">Minimax Expert</span>
-                    </div>
-                </div>
-                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
-            </button>
-        </div>
-    </div>
-
-    <!-- ONLINE LOBBY SCREEN -->
-    <div id="online-lobby-screen" class="w-full max-w-sm hidden-screen flex flex-col gap-6 animate-in slide-in-from-right-10 duration-500">
-        <div class="flex items-center gap-4 px-2">
-            <button onclick="navTo('home')" class="p-2 text-slate-400"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg></button>
-            <h2 class="text-xl font-black italic tracking-tighter">ONLINE LOBBY</h2>
-        </div>
-
-        <!-- CREATE ROOM -->
-        <div class="glass rounded-3xl p-6">
-            <h3 class="text-[10px] font-black uppercase text-indigo-400 mb-4 tracking-widest">Host a Match</h3>
-            <div class="flex items-center justify-between bg-black/40 p-4 rounded-2xl border border-white/5 mb-4">
-                <div>
-                    <p class="text-[8px] text-slate-500 font-bold uppercase mb-1">Your ID</p>
-                    <p id="my-room-id" class="text-xl font-black tracking-widest font-mono">FMK-7892</p>
-                </div>
-                <button onclick="copyRoomID()" class="p-3 bg-indigo-600 rounded-xl text-white">
-                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+      {screen === 'lobby' && (
+        <div className="w-full max-w-sm flex flex-col gap-6 animate-in slide-in-from-right-10">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setScreen('home')} className="p-2 text-slate-400"><ArrowLeft /></button>
+            <h2 className="text-2xl font-black italic">ROOM LOBBY</h2>
+          </div>
+          <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-[2rem] p-6 space-y-6">
+            <div>
+              <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4">Host Game</h3>
+              <button onClick={createRoom} className="w-full py-4 bg-indigo-600 rounded-2xl font-black text-xs tracking-widest flex items-center justify-center gap-2">
+                <Share2 size={16} /> CREATE ROOM
+              </button>
+            </div>
+            <div className="relative py-4">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
+              <div className="relative flex justify-center text-[10px] font-black uppercase bg-slate-950 px-4 text-slate-500">OR</div>
+            </div>
+            <div>
+              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Join Friend</h3>
+              <div className="flex gap-2">
+                <input 
+                  value={inputRoomID}
+                  onChange={(e) => setInputRoomID(e.target.value)}
+                  placeholder="ENTER ROOM ID" 
+                  className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 font-mono font-bold tracking-widest focus:outline-none focus:border-indigo-500"
+                />
+                <button onClick={() => joinRoom(inputRoomID)} className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center">
+                  <Search size={20} />
                 </button>
+              </div>
             </div>
-            <button onclick="navTo('searching')" class="w-full py-4 bg-indigo-600/20 border border-indigo-500/50 rounded-2xl font-black text-xs uppercase tracking-widest text-indigo-400">Waiting for Opponent...</button>
+          </div>
         </div>
+      )}
 
-        <!-- JOIN ROOM -->
-        <div class="glass rounded-3xl p-6">
-            <h3 class="text-[10px] font-black uppercase text-slate-400 mb-4 tracking-widest">Join a Friend</h3>
-            <div class="flex gap-3">
-                <input type="text" id="join-id-input" placeholder="ENTER ROOM ID" class="flex-1 bg-black/40 border border-white/10 rounded-2xl px-5 font-bold text-sm focus:outline-none focus:border-indigo-500 transition-all uppercase placeholder:text-slate-700">
-                <button onclick="joinRoom()" class="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-600/20">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                </button>
+      {screen === 'searching' && (
+        <div className="flex flex-col items-center justify-center gap-8 text-center animate-pulse">
+          <div className="w-32 h-32 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+          <div>
+            <h2 className="text-2xl font-black">WAITING FOR PLAYER</h2>
+            <div className="mt-4 bg-white/5 border border-white/10 p-6 rounded-2xl">
+              <p className="text-xs text-slate-400 uppercase font-bold mb-2">Share this ID with Friend</p>
+              <div className="flex items-center gap-4 justify-center">
+                 <span className="text-3xl font-mono font-black tracking-widest">{roomID}</span>
+                 <button onClick={() => { navigator.clipboard.writeText(roomID); }} className="p-2 bg-indigo-600 rounded-lg"><Copy size={16}/></button>
+              </div>
             </div>
+          </div>
+          <button onClick={() => setScreen('home')} className="px-8 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-bold uppercase">Cancel</button>
         </div>
+      )}
+
+      {screen === 'game' && (
+        <div className="w-full max-w-sm flex flex-col gap-6 animate-in slide-in-from-bottom-10">
+          <div className="flex justify-between items-center px-2">
+            <button onClick={() => setScreen('home')} className="p-2 text-slate-400"><ArrowLeft /></button>
+            <div className="text-center">
+              <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">
+                {gameState.winner ? (gameState.winner === 'draw' ? 'DRAW!' : `WINNER: ${gameState.winner}`) : `Player ${gameState.currentPlayer}'s Turn`}
+              </p>
+              <p className="text-[8px] text-slate-500 uppercase font-bold">
+                {gameMode === 'online' ? `Room: ${roomID}` : (gameMode === 'ai' ? 'Vs AI' : 'Local Match')}
+              </p>
+            </div>
+            <button onClick={resetGame} className="p-2 text-slate-400"><RefreshCw size={20}/></button>
+          </div>
+          <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-[2.5rem] p-4 aspect-square grid grid-cols-3 gap-3">
+            {gameState.board.map((cell, i) => (
+              <button 
+                key={i} 
+                onClick={() => handleMove(i)}
+                className="bg-slate-900/50 rounded-2xl flex items-center justify-center transition-all active:scale-95 border-b-4 border-black"
+              >
+                {cell === 'X' && <X className="text-indigo-500 drop-shadow-[0_0_8px_rgba(99,102,241,0.6)]" size={40} strokeWidth={3} />}
+                {cell === 'O' && <Circle className="text-pink-500 drop-shadow-[0_0_8px_rgba(236,72,153,0.6)]" size={40} strokeWidth={3} />}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: 'P1 (X)', val: scores.X },
+              { label: 'Draws', val: scores.draws },
+              { label: 'P2 (O)', val: scores.O }
+            ].map((item) => (
+              <div key={item.label} className="bg-white/5 border border-white/10 py-3 rounded-2xl text-center">
+                <p className="text-[8px] text-slate-500 font-bold uppercase">{item.label}</p>
+                <p className="text-xl font-black">{item.val}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {showSettings && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-6">
+          <div className="bg-slate-900 border border-white/10 w-full max-w-xs rounded-[2.5rem] p-8">
+             <h2 className="text-xl font-black mb-8 flex items-center gap-3 italic"><Settings /> SETTINGS</h2>
+             <div className="space-y-6">
+                {[
+                  { key: 'sfx', label: 'Sound FX' },
+                  { key: 'music', label: 'Background Music' },
+                  { key: 'vibe', label: 'Haptic Feedback' }
+                ].map(item => (
+                  <div key={item.key} className="flex justify-between items-center">
+                    <span className="text-xs font-bold uppercase tracking-widest text-slate-300">{item.label}</span>
+                    <button 
+                      onClick={() => setSettings(s => ({...s, [item.key]: !s[item.key]}))}
+                      className={`w-12 h-6 rounded-full transition-colors relative ${settings[item.key] ? 'bg-indigo-600' : 'bg-slate-700'}`}
+                    >
+                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${settings[item.key] ? 'left-7' : 'left-1'}`}></div>
+                    </button>
+                  </div>
+                ))}
+             </div>
+             <button onClick={() => setShowSettings(false)} className="w-full mt-10 py-4 bg-indigo-600 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-indigo-600/30">Close</button>
+          </div>
+        </div>
+      )}
     </div>
-
-    <!-- SEARCHING/MATCHING SCREEN -->
-    <div id="searching-screen" class="w-full max-w-sm hidden-screen flex flex-col items-center justify-center text-center p-8">
-        <div class="relative w-40 h-40 mb-10 flex items-center justify-center">
-            <div class="absolute inset-0 border-4 border-indigo-500/10 rounded-full"></div>
-            <div class="absolute inset-0 border-4 border-t-indigo-500 rounded-full animate-spin"></div>
-            <div class="absolute inset-4 ring-animate rounded-full bg-indigo-500/5 flex items-center justify-center">
-                <svg width="48" height="48" fill="currentColor" class="text-indigo-500" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
-            </div>
-        </div>
-        <h2 class="text-2xl font-black mb-2 tracking-tight">ESTABLISHING CONNECTION</h2>
-        <p class="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em] mb-12">Waiting for Player to Accept...</p>
-        <button onclick="navTo('online-lobby')" class="px-10 py-4 glass rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400">Abort Session</button>
-    </div>
-
-    <!-- SETTINGS PANEL -->
-    <div id="settings-panel" class="fixed inset-0 bg-black/80 backdrop-blur-md hidden items-center justify-center z-[800] p-6">
-        <div class="glass w-full max-w-xs rounded-[2.5rem] p-8">
-            <h3 class="text-xl font-black mb-6 flex items-center gap-3 italic">
-                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                SETTINGS
-            </h3>
-            <div class="space-y-6">
-                <div class="flex justify-between items-center">
-                    <span class="text-xs font-bold uppercase tracking-widest text-slate-300">Sound SFX</span>
-                    <label class="switch"><input type="checkbox" checked id="set-sfx"><span class="slider"></span></label>
-                </div>
-                <div class="flex justify-between items-center">
-                    <span class="text-xs font-bold uppercase tracking-widest text-slate-300">Music</span>
-                    <label class="switch"><input type="checkbox" checked id="set-music"><span class="slider"></span></label>
-                </div>
-                <div class="flex justify-between items-center">
-                    <span class="text-xs font-bold uppercase tracking-widest text-slate-300">Vibration</span>
-                    <label class="switch"><input type="checkbox" checked id="set-vibe"><span class="slider"></span></label>
-                </div>
-            </div>
-            <button onclick="togglePanel('settings-panel')" class="w-full mt-10 py-4 bg-indigo-600 rounded-2xl font-black text-xs uppercase tracking-widest btn-3d">Save & Exit</button>
-        </div>
-    </div>
-
-    <!-- TOAST -->
-    <div id="toast" class="glass px-6 py-3 rounded-full text-[10px] font-black tracking-widest uppercase border border-indigo-500/30">ID Copied to Clipboard</div>
-
-    <!-- GAME SCREEN -->
-    <div id="game-screen" class="w-full max-w-sm hidden-screen flex flex-col gap-6 animate-in slide-in-from-bottom-8 duration-500">
-        <div class="flex justify-between items-end px-2">
-            <button onclick="navTo('home')" class="p-2 text-slate-400"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg></button>
-            <div class="text-center">
-                <div id="status-text" class="text-[10px] font-black uppercase tracking-widest text-indigo-400">Player X Turn</div>
-                <div id="mode-label" class="text-[8px] text-slate-500 uppercase font-bold">VS Expert AI</div>
-            </div>
-            <button onclick="resetGame()" class="p-2 text-slate-400"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button>
-        </div>
-
-        <div class="glass rounded-[2.5rem] p-5 aspect-square grid grid-cols-3 grid-rows-3 gap-3 relative" id="board-container">
-            <div class="click-anywhere" id="click-shield"></div>
-            <div class="cell-3d rounded-2xl flex items-center justify-center" data-index="0"></div>
-            <div class="cell-3d rounded-2xl flex items-center justify-center" data-index="1"></div>
-            <div class="cell-3d rounded-2xl flex items-center justify-center" data-index="2"></div>
-            <div class="cell-3d rounded-2xl flex items-center justify-center" data-index="3"></div>
-            <div class="cell-3d rounded-2xl flex items-center justify-center" data-index="4"></div>
-            <div class="cell-3d rounded-2xl flex items-center justify-center" data-index="5"></div>
-            <div class="cell-3d rounded-2xl flex items-center justify-center" data-index="6"></div>
-            <div class="cell-3d rounded-2xl flex items-center justify-center" data-index="7"></div>
-            <div class="cell-3d rounded-2xl flex items-center justify-center" data-index="8"></div>
-        </div>
-
-        <div class="grid grid-cols-3 gap-3">
-            <div class="glass rounded-2xl p-3 text-center">
-                <p class="text-[8px] uppercase font-bold text-slate-500">P1 (X)</p>
-                <p id="score-x" class="text-xl font-black">0</p>
-            </div>
-            <div class="glass rounded-2xl p-3 text-center">
-                <p class="text-[8px] uppercase font-bold text-slate-500">Draw</p>
-                <p id="score-draw" class="text-xl font-black">0</p>
-            </div>
-            <div class="glass rounded-2xl p-3 text-center">
-                <p class="text-[8px] uppercase font-bold text-slate-500">P2 (O)</p>
-                <p id="score-o" class="text-xl font-black">0</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- WIN MODAL -->
-    <div id="win-modal" class="fixed inset-0 bg-black/90 backdrop-blur-xl hidden items-center justify-center z-[500] p-8">
-        <div class="glass w-full max-w-xs rounded-[3rem] p-10 text-center scale-90 transition-transform duration-300 border-2 border-indigo-500/20">
-            <div id="win-svg" class="w-20 h-20 mx-auto mb-6"></div>
-            <h2 id="win-title" class="text-4xl font-black italic mb-2 tracking-tighter text-indigo-400">VICTORY</h2>
-            <p id="win-text" class="text-slate-400 font-bold uppercase text-[10px] tracking-widest mb-10">You dominated the field</p>
-            <button id="win-replay-btn" onclick="closeWinModal()" class="w-full py-5 bg-indigo-600 btn-3d rounded-2xl font-black text-lg shadow-lg shadow-indigo-500/30 tracking-widest">REPLAY</button>
-        </div>
-    </div>
-
-    <script>
-        // --- AUDIO ENGINE ---
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        function playTone(freq, type, dur, vol = 0.1) {
-            if (!document.getElementById('set-sfx').checked) return;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = type;
-            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + dur);
-            osc.connect(gain); gain.connect(audioCtx.destination);
-            osc.start(); osc.stop(audioCtx.currentTime + dur);
-        }
-
-        function playWinSound() { [440, 554, 659].forEach((f, i) => setTimeout(() => playTone(f, 'triangle', 0.5), i * 150)); }
-        function playClickSound() { playTone(800, 'sine', 0.1); }
-        function triggerVibration(pattern = 50) { if (document.getElementById('set-vibe').checked && navigator.vibrate) navigator.vibrate(pattern); }
-
-        // --- SVGS ---
-        const SVG_X = `<svg class="w-10 h-10 svg-x" viewBox="0 0 100 100"><path d="M20,20 L80,80 M80,20 L20,80" stroke-linecap="round"/></svg>`;
-        const SVG_O = `<svg class="w-10 h-10 svg-o" viewBox="0 0 100 100"><circle cx="50" cy="50" r="35" fill="none" stroke-linecap="round"/></svg>`;
-        const SVG_TROPHY = `<svg width="80" height="80" fill="currentColor" class="text-amber-400" viewBox="0 0 24 24"><path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v3c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0011 15.9V19H7v2h10v-2h-4v-3.1a5.01 5.01 0 003.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 10V7h2v3H5zm14 0h-2V7h2v3z"/></svg>`;
-
-        // --- STATE ---
-        let board = Array(9).fill(null);
-        let currentPlayer = 'X';
-        let gameActive = true;
-        let gameMode = 'pvp';
-        let scores = { X: 0, O: 0, draws: 0 };
-
-        const cells = document.querySelectorAll('.cell-3d');
-        const statusText = document.getElementById('status-text');
-        const boardContainer = document.getElementById('board-container');
-        const clickShield = document.getElementById('click-shield');
-
-        // --- ROOM MANAGEMENT ---
-        function generateRoomID() {
-            const id = `FMK-${Math.floor(1000 + Math.random() * 9000)}`;
-            document.getElementById('my-room-id').textContent = id;
-        }
-
-        function copyRoomID() {
-            const id = document.getElementById('my-room-id').textContent;
-            const tempInput = document.createElement("input");
-            tempInput.value = id;
-            document.body.appendChild(tempInput);
-            tempInput.select();
-            document.execCommand("copy");
-            document.body.removeChild(tempInput);
-            
-            showToast("Room ID Copied!");
-        }
-
-        function showToast(msg) {
-            const toast = document.getElementById('toast');
-            toast.textContent = msg;
-            toast.style.transform = "translateX(-50%) translateY(0)";
-            setTimeout(() => toast.style.transform = "translateX(-50%) translateY(100px)", 2000);
-        }
-
-        function joinRoom() {
-            const id = document.getElementById('join-id-input').value.trim();
-            if (id.length < 4) {
-                showToast("Invalid Room ID");
-                return;
-            }
-            navTo('searching');
-            setTimeout(() => navTo('game', 'online'), 3000);
-        }
-
-        // --- NAVIGATION ---
-        function navTo(screen, mode) {
-            playClickSound();
-            document.querySelectorAll('body > div').forEach(el => {
-                if(!['win-modal', 'settings-panel', 'toast'].includes(el.id)) {
-                    el.classList.add('hidden-screen');
-                }
-            });
-            
-            const target = document.getElementById(`${screen}-screen`);
-            target.classList.remove('hidden-screen');
-
-            if(screen === 'online-lobby') generateRoomID();
-
-            if(screen === 'game') {
-                gameMode = mode;
-                const labels = { 'pvp': 'Local 1v1', 'online': 'Online Room', 'hard': 'Vs Expert AI' };
-                document.getElementById('mode-label').textContent = labels[mode];
-                resetGame();
-            }
-        }
-
-        function togglePanel(id) {
-            playClickSound();
-            const p = document.getElementById(id);
-            p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
-        }
-
-        // --- GAMEPLAY ---
-        function handleBoardClick(e) {
-            const rect = boardContainer.getBoundingClientRect();
-            const col = Math.floor((e.clientX - rect.left) / (rect.width / 3));
-            const row = Math.floor((e.clientY - rect.top) / (rect.height / 3));
-            const index = (row * 3) + col;
-            if (index >= 0 && index <= 8) processMove(index);
-        }
-
-        function processMove(index) {
-            if (board[index] || !gameActive) return;
-            
-            // Only AI mode can trigger "Auto" turn for O
-            if (gameMode !== 'hard' || currentPlayer === 'X') {
-                executeMove(index);
-            }
-            
-            if (gameActive && gameMode === 'hard' && currentPlayer === 'O') {
-                statusText.textContent = "AI Thinking...";
-                setTimeout(aiMove, 600);
-            }
-        }
-
-        function executeMove(index) {
-            playTone(currentPlayer === 'X' ? 400 : 300, 'sine', 0.1);
-            triggerVibration(30);
-            board[index] = currentPlayer;
-            cells[index].innerHTML = currentPlayer === 'X' ? SVG_X : SVG_O;
-
-            if (checkWin(board, currentPlayer)) {
-                endGame(currentPlayer);
-            } else if (board.every(c => c !== null)) {
-                endGame('draw');
-            } else {
-                currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
-                statusText.textContent = `Player ${currentPlayer} Turn`;
-                statusText.style.color = currentPlayer === 'X' ? '#6366f1' : '#ec4899';
-            }
-        }
-
-        function checkWin(b, p) {
-            const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-            return wins.some(pat => {
-                const won = pat.every(i => b[i] === p);
-                if(won && gameActive) pat.forEach(i => cells[i].style.background = 'rgba(99, 102, 241, 0.2)');
-                return won;
-            });
-        }
-
-        function aiMove() {
-            const best = minimax(board, 0, true);
-            if(best.index !== undefined) executeMove(best.index);
-        }
-
-        function minimax(tempBoard, depth, isMax) {
-            const check = (p) => [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]].some(pat => pat.every(i => tempBoard[i] === p));
-            const avail = tempBoard.map((v, i) => v === null ? i : null).filter(v => v !== null);
-
-            if (check('X')) return { score: -10 + depth };
-            if (check('O')) return { score: 10 - depth };
-            if (avail.length === 0) return { score: 0 };
-
-            const moves = [];
-            for (let i = 0; i < avail.length; i++) {
-                const move = { index: avail[i] };
-                tempBoard[avail[i]] = isMax ? 'O' : 'X';
-                move.score = minimax(tempBoard, depth + 1, !isMax).score;
-                tempBoard[avail[i]] = null;
-                moves.push(move);
-            }
-
-            let bestMove;
-            if (isMax) {
-                let bestScore = -Infinity;
-                moves.forEach((m, i) => { if(m.score > bestScore) { bestScore = m.score; bestMove = i; }});
-            } else {
-                let bestScore = Infinity;
-                moves.forEach((m, i) => { if(m.score < bestScore) { bestScore = m.score; bestMove = i; }});
-            }
-            return moves[bestMove];
-        }
-
-        function endGame(res) {
-            gameActive = false;
-            playWinSound();
-            triggerVibration([50, 100, 50]);
-            
-            const modal = document.getElementById('win-modal');
-            const title = document.getElementById('win-title');
-            const replayBtn = document.getElementById('win-replay-btn');
-
-            document.getElementById('win-svg').innerHTML = SVG_TROPHY;
-            
-            if (res === 'draw') {
-                title.textContent = "DRAW!";
-                scores.draws++;
-                document.getElementById('score-draw').textContent = scores.draws;
-            } else {
-                title.textContent = res === 'X' ? "X WINS!" : "O WINS!";
-                scores[res]++;
-                document.getElementById(`score-${res.toLowerCase()}`).textContent = scores[res];
-            }
-
-            replayBtn.textContent = gameMode === 'online' ? "RE-JOIN ROOM" : "PLAY AGAIN";
-            modal.style.display = 'flex';
-        }
-
-        function resetGame() {
-            board = Array(9).fill(null);
-            currentPlayer = 'X';
-            gameActive = true;
-            statusText.textContent = "Player X Turn";
-            statusText.style.color = '#6366f1';
-            cells.forEach(c => {
-                c.innerHTML = '';
-                c.style.background = 'rgba(15, 23, 42, 0.8)';
-            });
-        }
-
-        function closeWinModal() {
-            playClickSound();
-            document.getElementById('win-modal').style.display = 'none';
-            if (gameMode === 'online') {
-                navTo('online-lobby'); 
-            } else {
-                resetGame();
-            }
-        }
-
-        clickShield.addEventListener('click', handleBoardClick);
-    </script>
-</body>
-</html>
+  );
+}
 
