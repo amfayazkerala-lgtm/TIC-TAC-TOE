@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, collection, deleteDoc } from 'firebase/firestore';
-import { Trophy, Settings, Bell, Copy, Search, ArrowLeft, RefreshCw, X, Circle, Wifi, Share2 } from 'lucide-react';
+import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { Trophy, Settings, Bell, Copy, Search, ArrowLeft, RefreshCw, X, Circle, Wifi, Share2, Zap } from 'lucide-react';
 
 // --- Firebase Configuration ---
 const firebaseConfig = JSON.parse(__firebase_config);
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'tictactoe-fmk';
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'tictactoe-fmk-ultra';
 
 export default function App() {
+  const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [screen, setScreen] = useState('home');
-  const [gameMode, setGameMode] = useState(null); // 'pvp', 'ai', 'online'
+  const [gameMode, setGameMode] = useState(null); 
   const [roomID, setRoomID] = useState('');
   const [inputRoomID, setInputRoomID] = useState('');
   const [gameState, setGameState] = useState({
@@ -25,12 +26,14 @@ export default function App() {
     status: 'waiting'
   });
   const [scores, setScores] = useState({ X: 0, O: 0, draws: 0 });
-  const [settings, setSettings] = useState({ sfx: true, music: true, vibe: true });
   const [showSettings, setShowSettings] = useState(false);
 
-  // --- Auth Initialization (Rule 3) ---
+  // --- Splash Screen & Auth ---
   useEffect(() => {
-    const initAuth = async () => {
+    const init = async () => {
+      // Show splash for 2.5 seconds
+      setTimeout(() => setLoading(false), 2500);
+
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           await signInWithCustomToken(auth, __initial_auth_token);
@@ -38,97 +41,44 @@ export default function App() {
           await signInAnonymously(auth);
         }
       } catch (err) {
-        console.error("Auth failed:", err);
+        console.error("Auth Error:", err);
       }
     };
-    initAuth();
+    init();
     const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
     return () => unsubscribe();
   }, []);
 
-  // --- Real-time Game Sync (Online Only) ---
+  // --- Firestore Sync ---
   useEffect(() => {
     if (!user || gameMode !== 'online' || !roomID) return;
 
     const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomID);
-    
     const unsubscribe = onSnapshot(roomRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         setGameState(data);
-        
-        if (data.status === 'playing' && screen === 'searching') {
-          setScreen('game');
-        }
+        if (data.status === 'playing' && screen === 'searching') setScreen('game');
       } else if (screen === 'game') {
         setScreen('home');
       }
-    }, (error) => console.error("Firestore Error:", error));
+    }, (err) => console.error(err));
 
     return () => unsubscribe();
   }, [user, gameMode, roomID, screen]);
 
-  // --- AI Logic (Auto Mode) ---
+  // --- AI / Auto Mode ---
   useEffect(() => {
     if (gameMode === 'ai' && gameState.currentPlayer === 'O' && !gameState.winner) {
       const timer = setTimeout(() => {
         const avail = gameState.board.map((v, i) => v === null ? i : null).filter(v => v !== null);
-        if (avail.length > 0) {
-          const move = avail[Math.floor(Math.random() * avail.length)];
-          handleMove(move);
-        }
-      }, 600);
+        if (avail.length > 0) handleMove(avail[Math.floor(Math.random() * avail.length)]);
+      }, 700);
       return () => clearTimeout(timer);
     }
-  }, [gameState.currentPlayer, gameMode, gameState.winner, gameState.board]);
+  }, [gameState.currentPlayer, gameMode, gameState.winner]);
 
-  // --- Game Functions ---
-  const createRoom = async () => {
-    if (!user) return;
-    const newID = Math.floor(1000 + Math.random() * 9000).toString();
-    const initialData = {
-      board: Array(9).fill(null),
-      currentPlayer: 'X',
-      winner: null,
-      players: { X: user.uid, O: null },
-      status: 'waiting',
-      lastMove: Date.now()
-    };
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', newID), initialData);
-    setRoomID(newID);
-    setGameMode('online');
-    setScreen('searching');
-  };
-
-  const joinRoom = async (id) => {
-    if (!user || !id) return;
-    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id);
-    const snap = await getDoc(roomRef);
-    
-    if (snap.exists()) {
-      const data = snap.data();
-      if (data.players.O && data.players.O !== user.uid) {
-        return;
-      }
-      await updateDoc(roomRef, {
-        'players.O': user.uid,
-        status: 'playing'
-      });
-      setRoomID(id);
-      setGameMode('online');
-      setScreen('game');
-    }
-  };
-
-  const checkWin = (b) => {
-    const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-    for (let i = 0; i < lines.length; i++) {
-      const [a, b1, c] = lines[i];
-      if (b[a] && b[a] === b[b1] && b[a] === b[c]) return true;
-    }
-    return false;
-  };
-
+  // --- Game Logic ---
   const handleMove = async (index) => {
     if (gameState.board[index] || gameState.winner) return;
 
@@ -139,120 +89,146 @@ export default function App() {
 
     const newBoard = [...gameState.board];
     newBoard[index] = gameState.currentPlayer;
-    const win = checkWin(newBoard);
-    const nextPlayer = gameState.currentPlayer === 'X' ? 'O' : 'X';
+    
+    const checkWinner = (b) => {
+      const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+      for (let l of lines) {
+        if (b[l[0]] && b[l[0]] === b[l[1]] && b[l[0]] === b[l[2]]) return b[l[0]];
+      }
+      return b.every(c => c) ? 'draw' : null;
+    };
 
-    const updatedState = {
+    const winResult = checkWinner(newBoard);
+    const updated = {
       board: newBoard,
-      currentPlayer: nextPlayer,
-      winner: win ? gameState.currentPlayer : (newBoard.every(c => c) ? 'draw' : null)
+      currentPlayer: gameState.currentPlayer === 'X' ? 'O' : 'X',
+      winner: winResult
     };
 
     if (gameMode === 'online') {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomID), updatedState);
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomID), updated);
     } else {
-      setGameState(prev => ({ ...prev, ...updatedState }));
+      setGameState(prev => ({ ...prev, ...updated }));
     }
 
-    if (settings.vibe && navigator.vibrate) navigator.vibrate(30);
+    if (winResult) {
+      if (winResult === 'draw') setScores(s => ({...s, draws: s.draws + 1}));
+      else setScores(s => ({...s, [winResult]: s[winResult] + 1}));
+    }
+  };
+
+  const createRoom = async () => {
+    const id = Math.floor(1000 + Math.random() * 9000).toString();
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id), {
+      board: Array(9).fill(null),
+      currentPlayer: 'X',
+      winner: null,
+      players: { X: user.uid, O: null },
+      status: 'waiting'
+    });
+    setRoomID(id);
+    setGameMode('online');
+    setScreen('searching');
+  };
+
+  const joinRoom = async (id) => {
+    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id);
+    const snap = await getDoc(roomRef);
+    if (snap.exists() && !snap.data().players.O) {
+      await updateDoc(roomRef, { 'players.O': user.uid, status: 'playing' });
+      setRoomID(id);
+      setGameMode('online');
+      setScreen('game');
+    }
   };
 
   const resetGame = async () => {
     const reset = { board: Array(9).fill(null), currentPlayer: 'X', winner: null };
-    if (gameMode === 'online') {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomID), reset);
-    } else {
-      setGameState(prev => ({ ...prev, ...reset }));
-    }
+    if (gameMode === 'online') await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomID), reset);
+    else setGameState(p => ({...p, ...reset}));
   };
 
-  // Update scores when a winner is declared
-  useEffect(() => {
-    if (gameState.winner) {
-      if (gameState.winner === 'draw') {
-        setScores(s => ({ ...s, draws: s.draws + 1 }));
-      } else {
-        setScores(s => ({ ...s, [gameState.winner]: s[gameState.winner] + 1 }));
-      }
-    }
-  }, [gameState.winner]);
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-[999] animate-in fade-in duration-500">
+        <div className="relative mb-8">
+          <div className="w-24 h-24 border-4 border-indigo-500 rounded-full animate-ping opacity-25"></div>
+          <div className="absolute inset-0 flex items-center justify-center">
+             <Zap className="text-indigo-400 fill-indigo-400 animate-bounce" size={48} />
+          </div>
+        </div>
+        <h1 className="text-3xl font-black italic tracking-tighter text-white">FMK GAMES</h1>
+        <p className="text-[10px] text-indigo-500 font-bold tracking-[0.4em] uppercase mt-2">Loading Assets...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6 select-none overflow-hidden font-sans">
+    <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6 font-sans overflow-hidden">
+      
       {screen === 'home' && (
-        <div className="flex flex-col items-center gap-8 w-full max-w-sm animate-in fade-in zoom-in">
-          <div className="w-full flex justify-between">
-            <button className="p-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-full text-slate-400"><Bell size={20}/></button>
-            <button onClick={() => setShowSettings(true)} className="p-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-full text-slate-400"><Settings size={20}/></button>
+        <div className="w-full max-w-sm flex flex-col gap-10 animate-in zoom-in duration-300">
+          <div className="flex justify-between items-center">
+            <button className="p-3 bg-white/5 border border-white/10 rounded-full text-slate-400"><Bell size={20}/></button>
+            <div className="text-center">
+               <h1 className="text-4xl font-black italic tracking-tighter leading-none">TIC TAC TOE</h1>
+               <span className="text-[8px] font-black text-indigo-500 tracking-[0.5em] uppercase">Connect & Play</span>
+            </div>
+            <button onClick={() => setShowSettings(true)} className="p-3 bg-white/5 border border-white/10 rounded-full text-slate-400"><Settings size={20}/></button>
           </div>
-          <div className="text-center">
-            <h1 className="text-5xl font-black italic tracking-tighter text-white">TIC TAC TOE</h1>
-            <p className="text-[10px] font-bold text-indigo-400 tracking-[0.5em] uppercase">Connect & Play</p>
-          </div>
-          <div className="w-full space-y-4">
-            <button onClick={() => { setGameMode('pvp'); setScreen('game'); setGameState(p => ({...p, board: Array(9).fill(null), winner: null, status: 'playing'})); }} className="w-full py-5 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-between px-6 hover:bg-white/10 transition-colors">
-              <div className="flex items-center gap-4">
-                <X className="text-indigo-400" />
-                <div className="text-left">
-                  <span className="block font-bold">Local 1v1</span>
-                  <span className="text-[9px] text-slate-500 font-black uppercase">Offline with Friends</span>
-                </div>
-              </div>
-              <ArrowLeft className="rotate-180 text-slate-600" size={18} />
+
+          <div className="space-y-4">
+            <button onClick={() => { setGameMode('pvp'); setScreen('game'); resetGame(); }} className="w-full p-6 bg-white/5 border border-white/10 rounded-[2rem] flex items-center justify-between group hover:bg-white/10 transition-all">
+               <div className="flex items-center gap-4 text-left">
+                  <div className="p-3 bg-indigo-500/20 rounded-2xl text-indigo-400"><X size={24}/></div>
+                  <div>
+                    <p className="font-black text-lg">Local 1v1</p>
+                    <p className="text-[10px] text-slate-500 uppercase font-bold">Offline Match</p>
+                  </div>
+               </div>
+               <ArrowLeft size={20} className="rotate-180 text-slate-600 group-hover:text-white" />
             </button>
-            <button onClick={() => setScreen('lobby')} className="w-full py-5 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl flex items-center justify-between px-6">
-              <div className="flex items-center gap-4">
-                <Wifi className="text-indigo-400" />
-                <div className="text-left">
-                  <span className="block font-bold">Hotspot/Online</span>
-                  <span className="text-[9px] text-indigo-400 font-black uppercase">Host or Join Room</span>
-                </div>
-              </div>
-              <div className="bg-indigo-500 text-[8px] px-2 py-1 rounded font-black animate-pulse">LIVE</div>
+
+            <button onClick={() => setScreen('lobby')} className="w-full p-6 bg-indigo-600/10 border border-indigo-500/30 rounded-[2rem] flex items-center justify-between group transition-all">
+               <div className="flex items-center gap-4 text-left">
+                  <div className="p-3 bg-indigo-500/20 rounded-2xl text-indigo-400"><Wifi size={24}/></div>
+                  <div>
+                    <p className="font-black text-lg">Hotspot Room</p>
+                    <p className="text-[10px] text-indigo-400 uppercase font-bold">Online Multiplayer</p>
+                  </div>
+               </div>
+               <div className="bg-indigo-600 text-[9px] px-2 py-1 rounded font-black animate-pulse">LIVE</div>
             </button>
-            <button onClick={() => { setGameMode('ai'); setScreen('game'); setGameState(p => ({...p, board: Array(9).fill(null), winner: null, status: 'playing'})); }} className="w-full py-5 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-between px-6">
-              <div className="flex items-center gap-4">
-                <RefreshCw className="text-amber-400" />
-                <div className="text-left">
-                  <span className="block font-bold">Auto Mode (AI)</span>
-                  <span className="text-[9px] text-slate-500 font-black uppercase">Practice Solo</span>
-                </div>
-              </div>
-              <ArrowLeft className="rotate-180 text-slate-600" size={18} />
+
+            <button onClick={() => { setGameMode('ai'); setScreen('game'); resetGame(); }} className="w-full p-6 bg-white/5 border border-white/10 rounded-[2rem] flex items-center justify-between group transition-all">
+               <div className="flex items-center gap-4 text-left">
+                  <div className="p-3 bg-amber-500/20 rounded-2xl text-amber-400"><RefreshCw size={24}/></div>
+                  <div>
+                    <p className="font-black text-lg">Auto AI</p>
+                    <p className="text-[10px] text-slate-500 uppercase font-bold">Single Player</p>
+                  </div>
+               </div>
+               <ArrowLeft size={20} className="rotate-180 text-slate-600" />
             </button>
           </div>
         </div>
       )}
 
       {screen === 'lobby' && (
-        <div className="w-full max-w-sm flex flex-col gap-6 animate-in slide-in-from-right-10">
-          <div className="flex items-center gap-4">
-            <button onClick={() => setScreen('home')} className="p-2 text-slate-400"><ArrowLeft /></button>
+        <div className="w-full max-w-sm animate-in slide-in-from-right-10 duration-300">
+          <button onClick={() => setScreen('home')} className="mb-6 p-2 text-slate-400"><ArrowLeft/></button>
+          <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8 space-y-8">
             <h2 className="text-2xl font-black italic">ROOM LOBBY</h2>
-          </div>
-          <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-[2rem] p-6 space-y-6">
             <div>
-              <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4">Host Game</h3>
-              <button onClick={createRoom} className="w-full py-4 bg-indigo-600 rounded-2xl font-black text-xs tracking-widest flex items-center justify-center gap-2">
-                <Share2 size={16} /> CREATE ROOM
-              </button>
+              <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3">Host Session</p>
+              <button onClick={createRoom} className="w-full py-5 bg-indigo-600 rounded-2xl font-black flex items-center justify-center gap-2 shadow-xl shadow-indigo-600/20"><Share2 size={18}/> CREATE ROOM</button>
             </div>
-            <div className="relative py-4">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
-              <div className="relative flex justify-center text-[10px] font-black uppercase bg-slate-950 px-4 text-slate-500">OR</div>
-            </div>
+            <div className="flex items-center gap-4"><div className="h-[1px] flex-1 bg-white/10"></div><span className="text-[10px] font-bold text-slate-600">OR</span><div className="h-[1px] flex-1 bg-white/10"></div></div>
             <div>
-              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Join Friend</h3>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Join Friend</p>
               <div className="flex gap-2">
-                <input 
-                  value={inputRoomID}
-                  onChange={(e) => setInputRoomID(e.target.value)}
-                  placeholder="ENTER ROOM ID" 
-                  className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 font-mono font-bold tracking-widest focus:outline-none focus:border-indigo-500"
-                />
-                <button onClick={() => joinRoom(inputRoomID)} className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center">
-                  <Search size={20} />
-                </button>
+                <input value={inputRoomID} onChange={e => setInputRoomID(e.target.value)} placeholder="ENTER ID" className="flex-1 bg-black/40 border border-white/10 rounded-2xl px-5 font-mono font-bold focus:outline-none focus:border-indigo-500" />
+                <button onClick={() => joinRoom(inputRoomID)} className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center"><Search/></button>
               </div>
             </div>
           </div>
@@ -260,57 +236,48 @@ export default function App() {
       )}
 
       {screen === 'searching' && (
-        <div className="flex flex-col items-center justify-center gap-8 text-center animate-pulse">
-          <div className="w-32 h-32 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-          <div>
-            <h2 className="text-2xl font-black">WAITING FOR PLAYER</h2>
-            <div className="mt-4 bg-white/5 border border-white/10 p-6 rounded-2xl">
-              <p className="text-xs text-slate-400 uppercase font-bold mb-2">Share this ID with Friend</p>
-              <div className="flex items-center gap-4 justify-center">
-                 <span className="text-3xl font-mono font-black tracking-widest">{roomID}</span>
-                 <button onClick={() => { navigator.clipboard.writeText(roomID); }} className="p-2 bg-indigo-600 rounded-lg"><Copy size={16}/></button>
-              </div>
-            </div>
+        <div className="flex flex-col items-center justify-center text-center gap-8">
+          <div className="w-40 h-40 border-8 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+          <div className="bg-white/5 p-8 rounded-[2.5rem] border border-white/10 w-full max-w-xs">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Room ID</p>
+            <h2 className="text-5xl font-black tracking-widest mb-6 font-mono">{roomID}</h2>
+            <button onClick={() => navigator.clipboard.writeText(roomID)} className="flex items-center gap-2 mx-auto px-6 py-3 bg-indigo-600 rounded-xl text-xs font-black uppercase"><Copy size={16}/> Copy ID</button>
           </div>
-          <button onClick={() => setScreen('home')} className="px-8 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-bold uppercase">Cancel</button>
+          <button onClick={() => setScreen('home')} className="text-slate-500 font-bold uppercase text-xs tracking-widest underline decoration-2 underline-offset-8">Cancel Session</button>
         </div>
       )}
 
       {screen === 'game' && (
-        <div className="w-full max-w-sm flex flex-col gap-6 animate-in slide-in-from-bottom-10">
+        <div className="w-full max-w-sm flex flex-col gap-8 animate-in slide-in-from-bottom-10 duration-500">
           <div className="flex justify-between items-center px-2">
-            <button onClick={() => setScreen('home')} className="p-2 text-slate-400"><ArrowLeft /></button>
+            <button onClick={() => setScreen('home')} className="p-2 text-slate-400"><ArrowLeft/></button>
             <div className="text-center">
-              <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">
-                {gameState.winner ? (gameState.winner === 'draw' ? 'DRAW!' : `WINNER: ${gameState.winner}`) : `Player ${gameState.currentPlayer}'s Turn`}
-              </p>
-              <p className="text-[8px] text-slate-500 uppercase font-bold">
-                {gameMode === 'online' ? `Room: ${roomID}` : (gameMode === 'ai' ? 'Vs AI' : 'Local Match')}
-              </p>
+               <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">
+                  {gameState.winner ? (gameState.winner === 'draw' ? 'DRAW MATCH' : `PLAYER ${gameState.winner} WON`) : `Player ${gameState.currentPlayer} Turn`}
+               </p>
+               <p className="text-[8px] font-bold text-slate-600 uppercase">{gameMode === 'online' ? `Online: ${roomID}` : 'Local'}</p>
             </div>
             <button onClick={resetGame} className="p-2 text-slate-400"><RefreshCw size={20}/></button>
           </div>
-          <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-[2.5rem] p-4 aspect-square grid grid-cols-3 gap-3">
-            {gameState.board.map((cell, i) => (
-              <button 
-                key={i} 
-                onClick={() => handleMove(i)}
-                className="bg-slate-900/50 rounded-2xl flex items-center justify-center transition-all active:scale-95 border-b-4 border-black"
-              >
-                {cell === 'X' && <X className="text-indigo-500 drop-shadow-[0_0_8px_rgba(99,102,241,0.6)]" size={40} strokeWidth={3} />}
-                {cell === 'O' && <Circle className="text-pink-500 drop-shadow-[0_0_8px_rgba(236,72,153,0.6)]" size={40} strokeWidth={3} />}
-              </button>
-            ))}
+
+          <div className="bg-white/5 border border-white/10 p-4 rounded-[3rem] aspect-square grid grid-cols-3 gap-4">
+             {gameState.board.map((cell, i) => (
+               <button key={i} onClick={() => handleMove(i)} className="bg-slate-900 rounded-3xl flex items-center justify-center transition-all active:scale-90 border-b-4 border-black relative">
+                 {cell === 'X' && <X className="text-indigo-500 drop-shadow-[0_0_10px_rgba(99,102,241,0.5)]" size={48} strokeWidth={4} />}
+                 {cell === 'O' && <Circle className="text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.5)]" size={48} strokeWidth={4} />}
+               </button>
+             ))}
           </div>
-          <div className="grid grid-cols-3 gap-3">
+
+          <div className="grid grid-cols-3 gap-3 px-2">
             {[
               { label: 'P1 (X)', val: scores.X },
               { label: 'Draws', val: scores.draws },
               { label: 'P2 (O)', val: scores.O }
-            ].map((item) => (
-              <div key={item.label} className="bg-white/5 border border-white/10 py-3 rounded-2xl text-center">
-                <p className="text-[8px] text-slate-500 font-bold uppercase">{item.label}</p>
-                <p className="text-xl font-black">{item.val}</p>
+            ].map(item => (
+              <div key={item.label} className="bg-white/5 border border-white/10 rounded-2xl py-4 text-center">
+                 <p className="text-[8px] font-bold text-slate-500 uppercase mb-1">{item.label}</p>
+                 <p className="text-2xl font-black">{item.val}</p>
               </div>
             ))}
           </div>
@@ -318,28 +285,16 @@ export default function App() {
       )}
 
       {showSettings && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-6">
-          <div className="bg-slate-900 border border-white/10 w-full max-w-xs rounded-[2.5rem] p-8">
-             <h2 className="text-xl font-black mb-8 flex items-center gap-3 italic"><Settings /> SETTINGS</h2>
-             <div className="space-y-6">
-                {[
-                  { key: 'sfx', label: 'Sound FX' },
-                  { key: 'music', label: 'Background Music' },
-                  { key: 'vibe', label: 'Haptic Feedback' }
-                ].map(item => (
-                  <div key={item.key} className="flex justify-between items-center">
-                    <span className="text-xs font-bold uppercase tracking-widest text-slate-300">{item.label}</span>
-                    <button 
-                      onClick={() => setSettings(s => ({...s, [item.key]: !s[item.key]}))}
-                      className={`w-12 h-6 rounded-full transition-colors relative ${settings[item.key] ? 'bg-indigo-600' : 'bg-slate-700'}`}
-                    >
-                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${settings[item.key] ? 'left-7' : 'left-1'}`}></div>
-                    </button>
-                  </div>
-                ))}
-             </div>
-             <button onClick={() => setShowSettings(false)} className="w-full mt-10 py-4 bg-indigo-600 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-indigo-600/30">Close</button>
-          </div>
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 flex items-center justify-center p-6" onClick={() => setShowSettings(false)}>
+           <div className="bg-slate-900 border border-white/10 w-full max-w-xs rounded-[3rem] p-10 animate-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+              <h2 className="text-2xl font-black italic mb-8 flex items-center gap-3"><Settings/> SETTINGS</h2>
+              <div className="space-y-8">
+                 <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase text-slate-400">Audio SFX</span><div className="w-12 h-6 bg-indigo-600 rounded-full relative"><div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div></div></div>
+                 <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase text-slate-400">Background Music</span><div className="w-12 h-6 bg-indigo-600 rounded-full relative"><div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div></div></div>
+                 <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase text-slate-400">Haptic Vibe</span><div className="w-12 h-6 bg-indigo-600 rounded-full relative"><div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div></div></div>
+              </div>
+              <button onClick={() => setShowSettings(false)} className="w-full mt-12 py-5 bg-indigo-600 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-indigo-600/30">Back to Game</button>
+           </div>
         </div>
       )}
     </div>
