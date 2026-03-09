@@ -78,11 +78,11 @@
 </head>
 <body>
 
-    <!-- LOADING SCREEN (AUTO-HIDES IN 3 SECS) -->
+    <!-- LOADING SCREEN -->
     <div id="loader-screen" class="fixed inset-0 z-50 bg-[#020617] flex flex-col items-center justify-center">
         <div class="w-16 h-16 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-4"></div>
         <h1 class="text-xl font-black italic tracking-widest text-indigo-500">FMK ULTRA</h1>
-        <p class="text-[10px] text-slate-500 mt-2 uppercase tracking-[0.3em]">Initializing P2P Systems</p>
+        <p class="text-[10px] text-slate-500 mt-2 uppercase tracking-[0.3em]">Syncing Online Mode</p>
     </div>
 
     <!-- MAIN MENU -->
@@ -152,14 +152,13 @@
 
     <script>
         let peer, connection;
-        let myRole = 'X'; // X for host, O for joiner
+        let myRole = 'X'; 
         let gameMode = 'local';
         let board = Array(9).fill(null);
         let turn = 'X';
         let winner = null;
         let scores = { X: 0, O: 0, draw: 0 };
 
-        // INITIALIZE PEERJS
         function initPeer() {
             const randomId = Math.floor(1000 + Math.random() * 8999).toString();
             peer = new Peer(randomId);
@@ -168,13 +167,13 @@
                 document.getElementById('my-peer-id').innerText = id;
             });
 
-            // Incoming Connection
+            // If someone connects to you, you are X (Host)
             peer.on('connection', conn => {
                 connection = conn;
                 myRole = 'X';
                 gameMode = 'online';
                 setupMessaging();
-                showGame("ONLINE: X (YOU)");
+                showGame("ONLINE: YOU ARE X");
             });
         }
 
@@ -182,10 +181,10 @@
             const id = document.getElementById('friend-id-input').value;
             if(!id) return;
             connection = peer.connect(id);
-            myRole = 'O';
+            myRole = 'O'; // If you join, you are O
             gameMode = 'online';
             setupMessaging();
-            showGame("ONLINE: O (YOU)");
+            showGame("ONLINE: YOU ARE O");
         }
 
         function setupMessaging() {
@@ -200,24 +199,29 @@
                     resetLogic();
                 }
             });
-            connection.on('open', () => console.log("Link Established"));
         }
 
-        // GAME LOGIC
         function makeMove(i) {
+            // Block move if cell full, game over, or not your turn in online mode
             if (board[i] || winner) return;
             if (gameMode === 'online' && turn !== myRole) return;
 
             board[i] = turn;
             winner = checkWin(board);
-            const next = turn === 'X' ? 'O' : 'X';
+            const nextTurn = turn === 'X' ? 'O' : 'X';
 
-            if (gameMode === 'online') {
-                connection.send({ type: 'move', board, turn: next, winner });
+            // Send move to friend instantly
+            if (gameMode === 'online' && connection) {
+                connection.send({
+                    type: 'move',
+                    board: board,
+                    turn: nextTurn,
+                    winner: winner
+                });
             }
 
             if(winner) scores[winner === 'draw' ? 'draw' : winner]++;
-            turn = next;
+            turn = nextTurn;
             updateUI();
         }
 
@@ -255,7 +259,11 @@
                 status.innerText = winner === 'draw' ? "DRAW!" : `${winner} WINS!`;
                 status.className = `text-xs font-black uppercase ${winner==='X'?'x-text':'o-text'}`;
             } else {
-                status.innerText = (gameMode === 'online' && turn !== myRole) ? "WAITING..." : `${turn} TURN`;
+                if(gameMode === 'online') {
+                    status.innerText = (turn === myRole) ? "YOUR TURN" : "FRIEND'S TURN";
+                } else {
+                    status.innerText = `${turn} TURN`;
+                }
                 status.className = `text-xs font-black uppercase ${turn==='X'?'x-text':'o-text'}`;
             }
 
@@ -264,7 +272,6 @@
             document.getElementById('sd').innerText = scores.draw;
         }
 
-        // NAVIGATION
         function showMenu() { switchScreen('menu'); }
         function showLobby() { switchScreen('lobby'); }
         function startLocal() { gameMode = 'local'; showGame("Local 1v1"); }
@@ -282,322 +289,11 @@
         window.onload = () => {
             initPeer();
             updateUI();
-            // 3-second force load for mobile
             setTimeout(() => {
                 document.getElementById('loader-screen').style.display = 'none';
                 showMenu();
-            }, 3000);
+            }, 2000);
         };
-    </script>
-</body>
-</html>
-
-        </div>
-
-        <div class="grid grid-cols-3 gap-3">
-            <div class="neo-card py-4 text-center">
-                <p class="text-[9px] text-slate-500 uppercase font-bold mb-1">X-Force</p>
-                <p id="score-x" class="text-xl font-black x-glow">0</p>
-            </div>
-            <div class="neo-card py-4 text-center">
-                <p class="text-[9px] text-slate-500 uppercase font-bold mb-1">Draws</p>
-                <p id="score-draws" class="text-xl font-black">0</p>
-            </div>
-            <div class="neo-card py-4 text-center">
-                <p class="text-[9px] text-slate-500 uppercase font-bold mb-1">O-Squad</p>
-                <p id="score-o" class="text-xl font-black o-glow">0</p>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        let gameMode = 'pvp'; // 'pvp' or 'pve'
-        let boardState = Array(9).fill(null);
-        let turn = 'X';
-        let winner = null;
-        let scores = { X: 0, O: 0, draw: 0 };
-
-        function switchScreen(id) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-        }
-
-        function startGame(mode) {
-            gameMode = mode;
-            document.getElementById('mode-tag').innerText = `Mode: ${mode === 'pvp' ? 'Local 1v1' : 'Vs CPU'}`;
-            resetGame();
-            switchScreen('game');
-        }
-
-        function renderBoard() {
-            const board = document.getElementById('board');
-            board.innerHTML = '';
-            boardState.forEach((cell, i) => {
-                const btn = document.createElement('button');
-                btn.className = 'tic-cell';
-                if (cell === 'X') btn.innerHTML = '<span class="x-glow">X</span>';
-                if (cell === 'O') btn.innerHTML = '<span class="o-glow">O</span>';
-                btn.onclick = () => makeMove(i);
-                board.appendChild(btn);
-            });
-
-            const status = document.getElementById('turn-text');
-            if (winner) {
-                if (winner === 'draw') {
-                    status.innerText = "DRAW";
-                    status.className = "text-xs font-black uppercase tracking-widest text-slate-400";
-                } else {
-                    status.innerText = `VICTORY: ${winner}`;
-                    status.className = `text-xs font-black uppercase tracking-widest ${winner === 'X' ? 'x-glow' : 'o-glow'}`;
-                }
-            } else {
-                status.innerText = `TURN: ${turn}`;
-                status.className = `text-xs font-black uppercase tracking-widest ${turn === 'X' ? 'x-glow' : 'o-glow'}`;
-            }
-        }
-
-        function makeMove(i) {
-            if (boardState[i] || winner) return;
-
-            boardState[i] = turn;
-            winner = checkWin(boardState);
-            
-            if (winner) {
-                scores[winner === 'draw' ? 'draw' : winner]++;
-                updateScores();
-                renderBoard();
-                return;
-            }
-
-            turn = turn === 'X' ? 'O' : 'X';
-            renderBoard();
-
-            // CPU Turn
-            if (gameMode === 'pve' && turn === 'O' && !winner) {
-                setTimeout(cpuMove, 500);
-            }
-        }
-
-        function cpuMove() {
-            let available = boardState.map((v, i) => v === null ? i : null).filter(v => v !== null);
-            if (available.length > 0) {
-                // Simple AI: Try to win, then try to block, otherwise random
-                const move = available[Math.floor(Math.random() * available.length)];
-                makeMove(move);
-            }
-        }
-
-        function checkWin(b) {
-            const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-            for (let [a,b1,c] of lines) {
-                if (b[a] && b[a] === b[b1]
-
-    </div>
-
-    <!-- LOBBY -->
-    <div id="lobby" class="screen gap-6">
-        <div class="flex items-center gap-4">
-            <button onclick="switchScreen('menu')" class="p-2 neo-glass rounded-lg">Back</button>
-            <h2 class="text-xl font-bold">LOBBY</h2>
-        </div>
-        <div class="neo-glass p-6 rounded-3xl space-y-6">
-            <button onclick="createRoom()" class="w-full py-4 bg-indigo-600 rounded-xl font-bold uppercase active:scale-95">Host Match</button>
-            <div class="flex gap-2">
-                <input id="join-input" type="number" placeholder="Enter ID" class="flex-1 bg-black rounded-xl px-4 text-center font-bold outline-none focus:border-indigo-500 h-12">
-                <button onclick="joinRoom()" class="px-6 bg-white/10 rounded-xl font-bold">Join</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- WAITING -->
-    <div id="waiting" class="screen items-center text-center gap-8">
-        <div class="loader"></div>
-        <div class="neo-glass p-10 rounded-3xl w-full">
-            <p class="text-[10px] text-indigo-400 mb-2 font-bold">ROOM CODE</p>
-            <h2 id="room-code" class="text-5xl font-black tracking-widest">----</h2>
-        </div>
-        <button onclick="switchScreen('menu')" class="text-slate-500 font-bold text-xs uppercase underline">Cancel</button>
-    </div>
-
-    <!-- GAME -->
-    <div id="game" class="screen gap-4">
-        <div class="flex justify-between items-center neo-glass p-3 rounded-xl">
-            <div class="flex flex-col">
-                <p id="turn-text" class="text-xs font-bold x-glow">Turn: X</p>
-                <p id="room-id-tag" class="text-[8px] text-slate-500">Local</p>
-            </div>
-            <button onclick="resetGame()" class="px-4 py-2 bg-white/5 rounded-lg text-xs">Reset</button>
-        </div>
-        <div id="board" class="grid grid-cols-3 gap-3 aspect-square neo-glass p-3 rounded-3xl"></div>
-        <div class="grid grid-cols-3 gap-2">
-            <div class="neo-glass py-2 rounded-xl text-center"><p class="text-[8px] text-slate-500 uppercase">X</p><p id="score-x" class="font-black x-glow">0</p></div>
-            <div class="neo-glass py-2 rounded-xl text-center"><p class="text-[8px] text-slate-500 uppercase">D</p><p id="score-draws" class="font-black">0</p></div>
-            <div class="neo-glass py-2 rounded-xl text-center"><p class="text-[8px] text-slate-500 uppercase">O</p><p id="score-o" class="font-black o-glow">0</p></div>
-        </div>
-    </div>
-
-    <script>
-        const firebaseConfig = JSON.parse(__firebase_config);
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-        const auth = firebase.auth();
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'fmk-tac-v4';
-
-        let user = null, gameMode = 'local', currentRoom = null, boardState = Array(9).fill(null);
-        let turn = 'X', winner = null, scores = { X: 0, O: 0, draw: 0 }, unsubscribe = null;
-
-        async function initAuth() {
-            try {
-                // Rule 3: Wait for Auth FIRST
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await auth.signInWithCustomToken(__initial_auth_token);
-                } else {
-                    await auth.signInAnonymously();
-                }
-                user = auth.currentUser;
-                
-                // Connection successful
-                document.getElementById('online-btn').classList.remove('btn-disabled');
-                document.getElementById('net-status').innerText = 'READY';
-                document.getElementById('net-status').className = 'text-[10px] text-green-500 font-bold';
-                
-                setTimeout(() => switchScreen('menu'), 1500);
-            } catch (e) {
-                console.error(e);
-                document.getElementById('net-status').innerText = 'OFFLINE MODE';
-                setTimeout(() => switchScreen('menu'), 1500);
-            }
-        }
-
-        function switchScreen(id) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-            if (id === 'menu' && unsubscribe) { unsubscribe(); unsubscribe = null; }
-        }
-
-        function renderBoard() {
-            const board = document.getElementById('board');
-            board.innerHTML = '';
-            boardState.forEach((cell, i) => {
-                const btn = document.createElement('button');
-                btn.className = 'tic-cell';
-                if (cell === 'X') btn.innerHTML = '<span class="x-glow">X</span>';
-                if (cell === 'O') btn.innerHTML = '<span class="o-glow">O</span>';
-                btn.onclick = () => makeMove(i);
-                board.appendChild(btn);
-            });
-            const status = document.getElementById('turn-text');
-            if (winner) {
-                status.innerText = winner === 'draw' ? "DRAW!" : `WINNER: ${winner}`;
-                status.className = `text-xs font-bold uppercase ${winner === 'X' ? 'x-glow' : 'o-glow'}`;
-            } else {
-                status.innerText = `Turn: ${turn}`;
-                status.className = `text-xs font-bold uppercase ${turn === 'X' ? 'x-glow' : 'o-glow'}`;
-            }
-        }
-
-        async function makeMove(i) {
-            if (boardState[i] || winner || !user) return;
-            
-            if (gameMode === 'online') {
-                const roomRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(currentRoom);
-                const snap = await roomRef.get();
-                const d = snap.data();
-                const mySymbol = d.players.X === user.uid ? 'X' : 'O';
-                if (d.turn !== mySymbol || d.status !== 'playing') return;
-            }
-
-            boardState[i] = turn;
-            const win = checkWin(boardState);
-            const next = turn === 'X' ? 'O' : 'X';
-
-            if (gameMode === 'online') {
-                const roomRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(currentRoom);
-                await roomRef.update({ board: boardState, turn: next, winner: win });
-            } else {
-                turn = next; winner = win;
-                if(winner) { scores[winner === 'draw' ? 'draw' : winner]++; updateScores(); }
-                renderBoard();
-            }
-        }
-
-        function checkWin(b) {
-            const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-            for (let [a,b1,c] of lines) if (b[a] && b[a] === b[b1] && b[a] === b[c]) return b[a];
-            return b.every(v => v) ? 'draw' : null;
-        }
-
-        function updateScores() {
-            document.getElementById('score-x').innerText = scores.X;
-            document.getElementById('score-o').innerText = scores.O;
-            document.getElementById('score-draws').innerText = scores.draw;
-        }
-
-        function resetGame() {
-            boardState = Array(9).fill(null); turn = 'X'; winner = null;
-            if (gameMode === 'online') {
-                db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(currentRoom).update({ board: boardState, turn: 'X', winner: null });
-            } else renderBoard();
-        }
-
-        function startLocal() { 
-            gameMode = 'local'; 
-            document.getElementById('room-id-tag').innerText = 'Local'; 
-            resetGame(); 
-            switchScreen('game'); 
-        }
-
-        async function createRoom() {
-            if(!user) return;
-            gameMode = 'online';
-            const rid = Math.floor(1000 + Math.random() * 9000).toString();
-            currentRoom = rid;
-            document.getElementById('room-code').innerText = rid;
-            document.getElementById('room-id-tag').innerText = `ID: ${rid}`;
-            
-            const roomRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(rid);
-            await roomRef.set({
-                board: Array(9).fill(null), turn: 'X', winner: null, players: { X: user.uid, O: null }, status: 'waiting'
-            });
-            
-            switchScreen('waiting');
-            listen(rid);
-        }
-
-        async function joinRoom() {
-            if(!user) return;
-            const rid = document.getElementById('join-input').value;
-            if(!rid) return;
-            const roomRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(rid);
-            const snap = await roomRef.get();
-            
-            if(snap.exists() && !snap.data().players.O) {
-                gameMode = 'online'; currentRoom = rid;
-                document.getElementById('room-id-tag').innerText = `ID: ${rid}`;
-                await roomRef.update({ 'players.O': user.uid, status: 'playing' });
-                switchScreen('game');
-                listen(rid);
-            }
-        }
-
-        function listen(rid) {
-            if (unsubscribe) unsubscribe();
-            const roomRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(rid);
-            unsubscribe = roomRef.onSnapshot(s => {
-                if(!s.exists()) return;
-                const d = s.data();
-                boardState = d.board; turn = d.turn;
-                if(d.winner && d.winner !== winner) { 
-                    scores[d.winner === 'draw' ? 'draw' : d.winner]++; 
-                    updateScores(); 
-                }
-                winner = d.winner;
-                if(d.status === 'playing' && document.getElementById('waiting').classList.contains('active')) switchScreen('game');
-                renderBoard();
-            });
-        }
-
-        window.onload = initAuth;
     </script>
 </body>
 </html>
