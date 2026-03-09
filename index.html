@@ -17,6 +17,7 @@
             color: white;
             overflow: hidden;
             user-select: none;
+            touch-action: manipulation;
         }
 
         .glass {
@@ -27,7 +28,7 @@
 
         .cell {
             background: #0f172a;
-            box-shadow: 0 4px 0 #000;
+            box-shadow: 0 6px 0 #000;
             transition: all 0.1s;
         }
 
@@ -46,17 +47,18 @@
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
-        .splash-logo {
-            animation: pulse 2s infinite;
+        .bolt-glow {
+            filter: drop-shadow(0 0 15px rgba(99, 102, 241, 0.8));
+            animation: pulse 1.5s infinite ease-in-out;
         }
 
         @keyframes pulse {
             0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.1); opacity: 0.7; }
+            50% { transform: scale(1.15); opacity: 0.8; }
         }
     </style>
 </head>
@@ -64,37 +66,37 @@
 
     <!-- SPLASH SCREEN -->
     <div id="splash-screen" class="screen active fixed inset-0 flex-col items-center justify-center bg-slate-950 z-[100]">
-        <div class="splash-logo mb-6">
-            <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        <div class="bolt-glow mb-6">
+            <svg width="100" height="100" viewBox="0 0 24 24" fill="#6366f1" stroke="#6366f1" stroke-width="1"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
         </div>
-        <h1 class="text-4xl font-black italic tracking-tighter">FMK GAMES</h1>
-        <p class="text-[10px] text-indigo-500 font-bold tracking-[0.4em] uppercase mt-2">Initializing Battle...</p>
+        <h1 class="text-4xl font-black italic tracking-tighter text-white">FMK GAMES</h1>
+        <p class="text-[10px] text-indigo-500 font-bold tracking-[0.4em] uppercase mt-4">Initializing Battle...</p>
     </div>
 
     <!-- HOME SCREEN -->
     <div id="home-screen" class="screen w-full max-w-sm flex-col gap-10">
         <div class="text-center">
             <h1 class="text-5xl font-black italic tracking-tighter">BATTLE HUB</h1>
-            <p class="text-[10px] text-indigo-500 font-bold tracking-[0.5em] uppercase">Mini Militia Style</p>
+            <p class="text-[10px] text-indigo-500 font-bold tracking-[0.5em] uppercase">Connect & Play</p>
         </div>
 
         <div class="space-y-4">
-            <button onclick="startLocal()" class="w-full p-6 glass rounded-[2rem] flex items-center gap-4 text-left hover:bg-white/5">
+            <button onclick="startLocal()" class="w-full p-6 glass rounded-[2.5rem] flex items-center gap-4 text-left hover:bg-white/5 transition-all">
                 <div class="p-3 bg-indigo-500/20 rounded-2xl text-indigo-400">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
                 </div>
                 <div>
-                    <p class="font-black text-lg">Local Play</p>
-                    <p class="text-[10px] text-slate-500 font-bold uppercase">1v1 Same Device</p>
+                    <p class="font-black text-xl">Local 1v1</p>
+                    <p class="text-[10px] text-slate-500 font-bold uppercase">Offline Match</p>
                 </div>
             </button>
 
-            <button onclick="showLobby()" class="w-full p-6 bg-indigo-600 border border-indigo-400 rounded-[2rem] flex items-center gap-4 shadow-lg shadow-indigo-600/30">
+            <button onclick="showLobby()" class="w-full p-6 bg-indigo-600 border border-indigo-400 rounded-[2.5rem] flex items-center gap-4 shadow-xl shadow-indigo-600/30 active:scale-95 transition-all">
                 <div class="p-3 bg-white/20 rounded-2xl text-white">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
                 </div>
                 <div>
-                    <p class="font-black text-lg">Hotspot Room</p>
+                    <p class="font-black text-xl">Hotspot Room</p>
                     <p class="text-[10px] text-indigo-200 font-bold uppercase">Multiplayer Connect</p>
                 </div>
             </button>
@@ -103,8 +105,257 @@
 
     <!-- LOBBY SCREEN -->
     <div id="lobby-screen" class="screen w-full max-w-sm flex-col gap-6">
-        <button onclick="showHome()" class="self-start text-slate-500"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+        <button onclick="showHome()" class="p-2 text-slate-500"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
         <div class="glass p-8 rounded-[2.5rem] space-y-8">
+            <h2 class="text-2xl font-black italic uppercase">Lobby</h2>
+            <button onclick="createRoom()" class="w-full py-5 bg-indigo-600 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-indigo-600/20 active:scale-95 transition-all">Host Room</button>
+            <div class="flex items-center gap-4"><div class="h-[1px] flex-1 bg-white/10"></div><span class="text-[10px] font-bold text-slate-600 uppercase">Join Friend</span><div class="h-[1px] flex-1 bg-white/10"></div></div>
+            <div class="flex gap-2">
+                <input id="join-input" type="number" placeholder="ENTER ID" class="flex-1 bg-black/40 border border-white/10 rounded-2xl px-5 font-bold outline-none focus:border-indigo-500 h-14">
+                <button onclick="joinRoom()" class="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center hover:bg-white/20"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- WAITING SCREEN -->
+    <div id="waiting-screen" class="screen flex-col items-center gap-8 text-center">
+        <div class="relative">
+            <div class="w-32 h-32 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+            <div class="absolute inset-0 flex items-center justify-center font-black text-indigo-400">...</div>
+        </div>
+        <div class="glass p-8 rounded-[3rem] border-indigo-500/30 min-w-[200px]">
+            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Room ID</p>
+            <h2 id="display-room-id" class="text-6xl font-black tracking-[0.2em] font-mono text-white">0000</h2>
+        </div>
+        <button onclick="showHome()" class="text-slate-500 font-bold uppercase text-xs tracking-[0.3em] underline underline-offset-8">Cancel Hub</button>
+    </div>
+
+    <!-- GAME SCREEN -->
+    <div id="game-screen" class="screen w-full max-w-sm flex-col gap-6">
+        <div class="flex justify-between items-center glass p-4 rounded-[2rem]">
+            <button onclick="showHome()" class="p-2 text-slate-500"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+            <div class="text-center">
+                <p id="turn-status" class="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Player X Turn</p>
+                <p id="room-tag" class="text-[8px] font-bold text-slate-600 uppercase">Local Match</p>
+            </div>
+            <button onclick="resetBoard()" class="p-2 text-slate-500"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
+        </div>
+
+        <div id="board" class="glass p-4 rounded-[3rem] aspect-square grid grid-cols-3 gap-3">
+            <!-- 9 Cells generated by JS -->
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+            <div class="glass py-3 rounded-2xl text-center">
+                <p class="text-[8px] font-bold text-slate-500 uppercase">P1 (X)</p>
+                <p id="score-x" class="text-xl font-black">0</p>
+            </div>
+            <div class="glass py-3 rounded-2xl text-center">
+                <p class="text-[8px] font-bold text-slate-500 uppercase">Draws</p>
+                <p id="score-draw" class="text-xl font-black">0</p>
+            </div>
+            <div class="glass py-3 rounded-2xl text-center">
+                <p class="text-[8px] font-bold text-slate-500 uppercase">P2 (O)</p>
+                <p id="score-o" class="text-xl font-black">0</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Firebase Init ---
+        const config = JSON.parse(__firebase_config);
+        firebase.initializeApp(config);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'fmk-tictac-pro';
+
+        let user = null;
+        let gameMode = 'local';
+        let roomID = null;
+        let boardState = Array(9).fill(null);
+        let currentPlayer = 'X';
+        let winner = null;
+        let unsubscribe = null;
+        let scores = { X: 0, O: 0, draw: 0 };
+
+        // --- Auth Setup ---
+        async function initAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await auth.signInWithCustomToken(__initial_auth_token);
+                } else {
+                    await auth.signInAnonymously();
+                }
+                user = auth.currentUser;
+            } catch (e) { console.error("Auth failed", e); }
+        }
+
+        // --- Navigation ---
+        function switchScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function showHome() { 
+            if (unsubscribe) unsubscribe();
+            switchScreen('home-screen'); 
+        }
+        function showLobby() { switchScreen('lobby-screen'); }
+
+        // --- Game Logic ---
+        function createBoard() {
+            const boardEl = document.getElementById('board');
+            boardEl.innerHTML = '';
+            boardState.forEach((val, i) => {
+                const cell = document.createElement('button');
+                cell.className = 'cell rounded-[1.8rem] flex items-center justify-center text-5xl font-black';
+                if (val === 'X') cell.innerHTML = '<span class="text-indigo-500" style="text-shadow: 0 0 15px rgba(99,102,241,0.5)">X</span>';
+                if (val === 'O') cell.innerHTML = '<span class="text-pink-500" style="text-shadow: 0 0 15px rgba(236,72,153,0.5)">O</span>';
+                cell.onclick = () => handleMove(i);
+                boardEl.appendChild(cell);
+            });
+        }
+
+        function checkWinner(b) {
+            const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+            for (let [a,b1,c] of lines) {
+                if (b[a] && b[a] === b[b1] && b[a] === b[c]) return b[a];
+            }
+            return b.every(v => v) ? 'draw' : null;
+        }
+
+        async function handleMove(i) {
+            if (boardState[i] || winner) return;
+
+            if (gameMode === 'online') {
+                const snap = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(roomID).get();
+                const data = snap.data();
+                const mySymbol = data.players.X === user.uid ? 'X' : 'O';
+                if (data.currentPlayer !== mySymbol || data.status !== 'playing') return;
+            }
+
+            boardState[i] = currentPlayer;
+            winner = checkWinner(boardState);
+            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+
+            if (gameMode === 'online') {
+                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(roomID).update({
+                    board: boardState,
+                    currentPlayer: currentPlayer,
+                    winner: winner
+                });
+            } else {
+                if (winner) updateScores(winner);
+                updateUI();
+            }
+        }
+
+        function updateScores(w) {
+            scores[w]++;
+            document.getElementById('score-x').innerText = scores.X;
+            document.getElementById('score-o').innerText = scores.O;
+            document.getElementById('score-draw').innerText = scores.draw;
+        }
+
+        function updateUI() {
+            createBoard();
+            const status = document.getElementById('turn-status');
+            if (winner) {
+                status.innerText = winner === 'draw' ? "DRAW MATCH!" : `PLAYER ${winner} WINS!`;
+                status.className = "text-[10px] font-black uppercase tracking-widest " + (winner === 'X' ? 'text-indigo-400' : winner === 'O' ? 'text-pink-400' : 'text-amber-400');
+            } else {
+                status.innerText = `Player ${currentPlayer} Turn`;
+                status.className = "text-[10px] font-black uppercase tracking-widest text-indigo-400";
+            }
+        }
+
+        function resetBoard() {
+            boardState = Array(9).fill(null);
+            currentPlayer = 'X';
+            winner = null;
+            if (gameMode === 'online') {
+                db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(roomID).update({
+                    board: boardState, currentPlayer: 'X', winner: null
+                });
+            } else {
+                updateUI();
+            }
+        }
+
+        // --- Network Actions ---
+        function startLocal() {
+            gameMode = 'local';
+            document.getElementById('room-tag').innerText = 'Local Match';
+            resetBoard();
+            switchScreen('game-screen');
+        }
+
+        async function createRoom() {
+            gameMode = 'online';
+            roomID = Math.floor(1000 + Math.random() * 9000).toString();
+            document.getElementById('display-room-id').innerText = roomID;
+            document.getElementById('room-tag').innerText = `Room: ${roomID}`;
+            
+            await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(roomID).set({
+                board: Array(9).fill(null),
+                currentPlayer: 'X',
+                winner: null,
+                players: { X: user.uid, O: null },
+                status: 'waiting'
+            });
+
+            switchScreen('waiting-screen');
+            listenToRoom();
+        }
+
+        async function joinRoom() {
+            const id = document.getElementById('join-input').value;
+            if (!id) return;
+            const ref = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(id);
+            const snap = await ref.get();
+            
+            if (snap.exists() && !snap.data().players.O) {
+                gameMode = 'online';
+                roomID = id;
+                document.getElementById('room-tag').innerText = `Room: ${id}`;
+                await ref.update({ 'players.O': user.uid, status: 'playing' });
+                switchScreen('game-screen');
+                listenToRoom();
+            }
+        }
+
+        function listenToRoom() {
+            if (unsubscribe) unsubscribe();
+            unsubscribe = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(roomID)
+                .onSnapshot(snap => {
+                    if (!snap.exists()) return;
+                    const data = snap.data();
+                    boardState = data.board;
+                    currentPlayer = data.currentPlayer;
+                    const oldWinner = winner;
+                    winner = data.winner;
+                    
+                    if (winner && winner !== oldWinner) updateScores(winner);
+
+                    if (data.status === 'playing' && document.getElementById('waiting-screen').classList.contains('active')) {
+                        switchScreen('game-screen');
+                    }
+                    updateUI();
+                });
+        }
+
+        // --- Boot ---
+        window.onload = async () => {
+            await initAuth();
+            // Forced transition after splash
+            setTimeout(() => {
+                switchScreen('home-screen');
+            }, 2500);
+        };
+    </script>
+</body>
+</html>
+
             <h2 class="text-2xl font-black italic uppercase">Multiplayer</h2>
             <div>
                 <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3">Host</p>
