@@ -5,17 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Tic-Tac-Toe Pro | FMK</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Inter:wght@400;700&display=swap');
         
-        :root {
-            --primary: #6366f1;
-            --secondary: #ec4899;
-        }
-
         body {
             font-family: 'Inter', sans-serif;
             background: #020617;
@@ -31,80 +23,215 @@
 
         h1, h2 { font-family: 'Orbitron', sans-serif; }
 
-        .neo-glass {
+        .neo-card {
             background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(15px);
+            backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 2rem;
         }
 
         .tic-cell {
             background: #0f172a;
             border-bottom: 5px solid #000;
-            border-radius: 1rem;
+            border-radius: 1.2rem;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2.5rem;
+            font-size: 3rem;
             font-weight: 900;
+            aspect-ratio: 1/1;
             transition: 0.1s;
         }
 
         .tic-cell:active { border-bottom-width: 0; transform: translateY(4px); }
 
-        .x-glow { color: var(--primary); text-shadow: 0 0 15px var(--primary); }
-        .o-glow { color: var(--secondary); text-shadow: 0 0 15px var(--secondary); }
+        .x-glow { color: #6366f1; text-shadow: 0 0 15px #6366f1; }
+        .o-glow { color: #ec4899; text-shadow: 0 0 15px #ec4899; }
 
         .screen {
             display: none;
             width: 100%;
             max-width: 400px;
             flex-direction: column;
-            padding: 20px;
-            animation: fadeIn 0.3s ease-in;
+            padding: 24px;
         }
 
         .screen.active { display: flex; }
 
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        .loader {
-            width: 30px;
-            height: 30px;
-            border: 3px solid #1e293b;
-            border-top: 3px solid var(--primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
+        .btn-action {
+            background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
+            border-radius: 1.5rem;
+            transition: 0.2s;
         }
-        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .btn-action:active { transform: scale(0.95); }
 
-        .btn-disabled { opacity: 0.5; pointer-events: none; }
+        /* Tactical decorative lines */
+        .scanline {
+            width: 100%;
+            height: 2px;
+            background: rgba(99, 102, 241, 0.1);
+            position: absolute;
+            top: 0;
+            animation: moveScan 4s linear infinite;
+        }
+        @keyframes moveScan { from { top: 0; } to { top: 100%; } }
     </style>
 </head>
 <body>
+    <div class="scanline"></div>
 
-    <!-- SPLASH -->
-    <div id="splash" class="screen active items-center text-center">
-        <svg width="60" height="60" viewBox="0 0 24 24" fill="var(--primary)" class="mb-6"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-        <h1 class="text-2xl font-black italic mb-4">FMK GAMES</h1>
-        <div class="loader"></div>
+    <!-- MAIN MENU -->
+    <div id="menu" class="screen active gap-5">
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-black italic x-glow tracking-tighter">BATTLE HUB</h1>
+            <p class="text-[10px] tracking-[0.4em] text-indigo-400 uppercase font-bold mt-1">Tactical Combat Unit</p>
+        </div>
+        
+        <div class="flex flex-col gap-4">
+            <button onclick="startGame('pvp')" class="neo-card p-6 flex items-center gap-5 active:bg-white/10">
+                <div class="w-12 h-12 bg-indigo-500/20 rounded-xl flex items-center justify-center text-2xl">⚔️</div>
+                <div class="text-left">
+                    <h3 class="font-bold text-lg">Local 1v1</h3>
+                    <p class="text-[10px] text-slate-500 uppercase font-bold">Pass & Play</p>
+                </div>
+            </button>
+
+            <button onclick="startGame('pve')" class="neo-card p-6 flex items-center gap-5 active:bg-white/10">
+                <div class="w-12 h-12 bg-pink-500/20 rounded-xl flex items-center justify-center text-2xl">🤖</div>
+                <div class="text-left">
+                    <h3 class="font-bold text-lg">Vs CPU</h3>
+                    <p class="text-[10px] text-slate-500 uppercase font-bold">Training Mode</p>
+                </div>
+            </button>
+
+            <div class="neo-card p-4 text-center opacity-40">
+                <p class="text-[9px] text-slate-500 uppercase font-bold">Online Mode Locked</p>
+                <p class="text-[8px] text-slate-600 mt-1">Requires Firebase Hosting</p>
+            </div>
+        </div>
+
+        <p class="text-[9px] text-center text-slate-700 uppercase mt-10 font-bold tracking-widest">FMK PRO V3.0 • OFFLINE EDITION</p>
     </div>
 
-    <!-- MENU -->
-    <div id="menu" class="screen gap-4">
-        <h1 class="text-center text-3xl font-black x-glow mb-6 italic">BATTLE HUB</h1>
-        
-        <button onclick="startLocal()" class="neo-glass p-6 rounded-2xl flex items-center gap-4 active:bg-white/10">
-            <div class="w-12 h-12 bg-slate-800 rounded-lg flex items-center justify-center">🤝</div>
-            <div class="text-left"><h3 class="font-bold">Local 1v1</h3><p class="text-[10px] text-slate-500">Same Phone</p></div>
-        </button>
-
-        <button id="online-btn" onclick="switchScreen('lobby')" class="neo-glass p-6 rounded-2xl flex items-center gap-4 active:bg-white/10 btn-disabled">
-            <div class="w-12 h-12 bg-indigo-900 rounded-lg flex items-center justify-center">🌐</div>
-            <div class="text-left">
-                <h3 class="font-bold">Online Match</h3>
-                <p id="net-status" class="text-[10px] text-red-500 font-bold">CONNECTING...</p>
+    <!-- GAME BOARD -->
+    <div id="game" class="screen gap-5">
+        <div class="flex justify-between items-center neo-card p-4">
+            <div class="flex flex-col">
+                <p id="turn-text" class="text-xs font-black x-glow uppercase tracking-widest">Turn: X</p>
+                <p id="mode-tag" class="text-[9px] text-slate-500 font-bold uppercase">Mode: PvP</p>
             </div>
-        </button>
+            <div class="flex gap-2">
+                <button onclick="resetGame()" class="p-2 bg-white/5 rounded-lg">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                </button>
+                <button onclick="switchScreen('menu')" class="p-2 bg-white/5 rounded-lg">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <div id="board" class="grid grid-cols-3 gap-4 aspect-square neo-card p-4">
+            <!-- Cells generated by JS -->
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+            <div class="neo-card py-4 text-center">
+                <p class="text-[9px] text-slate-500 uppercase font-bold mb-1">X-Force</p>
+                <p id="score-x" class="text-xl font-black x-glow">0</p>
+            </div>
+            <div class="neo-card py-4 text-center">
+                <p class="text-[9px] text-slate-500 uppercase font-bold mb-1">Draws</p>
+                <p id="score-draws" class="text-xl font-black">0</p>
+            </div>
+            <div class="neo-card py-4 text-center">
+                <p class="text-[9px] text-slate-500 uppercase font-bold mb-1">O-Squad</p>
+                <p id="score-o" class="text-xl font-black o-glow">0</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let gameMode = 'pvp'; // 'pvp' or 'pve'
+        let boardState = Array(9).fill(null);
+        let turn = 'X';
+        let winner = null;
+        let scores = { X: 0, O: 0, draw: 0 };
+
+        function switchScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function startGame(mode) {
+            gameMode = mode;
+            document.getElementById('mode-tag').innerText = `Mode: ${mode === 'pvp' ? 'Local 1v1' : 'Vs CPU'}`;
+            resetGame();
+            switchScreen('game');
+        }
+
+        function renderBoard() {
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+            boardState.forEach((cell, i) => {
+                const btn = document.createElement('button');
+                btn.className = 'tic-cell';
+                if (cell === 'X') btn.innerHTML = '<span class="x-glow">X</span>';
+                if (cell === 'O') btn.innerHTML = '<span class="o-glow">O</span>';
+                btn.onclick = () => makeMove(i);
+                board.appendChild(btn);
+            });
+
+            const status = document.getElementById('turn-text');
+            if (winner) {
+                if (winner === 'draw') {
+                    status.innerText = "DRAW";
+                    status.className = "text-xs font-black uppercase tracking-widest text-slate-400";
+                } else {
+                    status.innerText = `VICTORY: ${winner}`;
+                    status.className = `text-xs font-black uppercase tracking-widest ${winner === 'X' ? 'x-glow' : 'o-glow'}`;
+                }
+            } else {
+                status.innerText = `TURN: ${turn}`;
+                status.className = `text-xs font-black uppercase tracking-widest ${turn === 'X' ? 'x-glow' : 'o-glow'}`;
+            }
+        }
+
+        function makeMove(i) {
+            if (boardState[i] || winner) return;
+
+            boardState[i] = turn;
+            winner = checkWin(boardState);
+            
+            if (winner) {
+                scores[winner === 'draw' ? 'draw' : winner]++;
+                updateScores();
+                renderBoard();
+                return;
+            }
+
+            turn = turn === 'X' ? 'O' : 'X';
+            renderBoard();
+
+            // CPU Turn
+            if (gameMode === 'pve' && turn === 'O' && !winner) {
+                setTimeout(cpuMove, 500);
+            }
+        }
+
+        function cpuMove() {
+            let available = boardState.map((v, i) => v === null ? i : null).filter(v => v !== null);
+            if (available.length > 0) {
+                // Simple AI: Try to win, then try to block, otherwise random
+                const move = available[Math.floor(Math.random() * available.length)];
+                makeMove(move);
+            }
+        }
+
+        function checkWin(b) {
+            const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+            for (let [a,b1,c] of lines) {
+                if (b[a] && b[a] === b[b1]
+
     </div>
 
     <!-- LOBBY -->
