@@ -1,303 +1,329 @@
-import React, { useState, useEffect } from 'react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
-import { Trophy, Settings, Bell, Copy, Search, ArrowLeft, RefreshCw, X, Circle, Wifi, Share2, Zap } from 'lucide-react';
-
-// --- Firebase Configuration ---
-const firebaseConfig = JSON.parse(__firebase_config);
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'tictactoe-fmk-ultra';
-
-export default function App() {
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
-  const [screen, setScreen] = useState('home');
-  const [gameMode, setGameMode] = useState(null); 
-  const [roomID, setRoomID] = useState('');
-  const [inputRoomID, setInputRoomID] = useState('');
-  const [gameState, setGameState] = useState({
-    board: Array(9).fill(null),
-    currentPlayer: 'X',
-    winner: null,
-    players: { X: null, O: null },
-    status: 'waiting'
-  });
-  const [scores, setScores] = useState({ X: 0, O: 0, draws: 0 });
-  const [showSettings, setShowSettings] = useState(false);
-
-  // --- Splash Screen & Auth ---
-  useEffect(() => {
-    const init = async () => {
-      // Show splash for 2.5 seconds
-      setTimeout(() => setLoading(false), 2500);
-
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic-Tac-Toe Battle Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #020617;
+            color: white;
+            overflow: hidden;
+            user-select: none;
         }
-      } catch (err) {
-        console.error("Auth Error:", err);
-      }
-    };
-    init();
-    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
-    return () => unsubscribe();
-  }, []);
 
-  // --- Firestore Sync ---
-  useEffect(() => {
-    if (!user || gameMode !== 'online' || !roomID) return;
+        .glass {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
 
-    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomID);
-    const unsubscribe = onSnapshot(roomRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.data();
-        setGameState(data);
-        if (data.status === 'playing' && screen === 'searching') setScreen('game');
-      } else if (screen === 'game') {
-        setScreen('home');
-      }
-    }, (err) => console.error(err));
+        .cell {
+            background: #0f172a;
+            box-shadow: 0 4px 0 #000;
+            transition: all 0.1s;
+        }
 
-    return () => unsubscribe();
-  }, [user, gameMode, roomID, screen]);
+        .cell:active {
+            box-shadow: 0 0px 0 #000;
+            transform: translateY(4px);
+        }
 
-  // --- AI / Auto Mode ---
-  useEffect(() => {
-    if (gameMode === 'ai' && gameState.currentPlayer === 'O' && !gameState.winner) {
-      const timer = setTimeout(() => {
-        const avail = gameState.board.map((v, i) => v === null ? i : null).filter(v => v !== null);
-        if (avail.length > 0) handleMove(avail[Math.floor(Math.random() * avail.length)]);
-      }, 700);
-      return () => clearTimeout(timer);
-    }
-  }, [gameState.currentPlayer, gameMode, gameState.winner]);
+        .screen {
+            display: none;
+            animation: fadeIn 0.4s ease-out;
+        }
 
-  // --- Game Logic ---
-  const handleMove = async (index) => {
-    if (gameState.board[index] || gameState.winner) return;
+        .screen.active {
+            display: flex;
+        }
 
-    if (gameMode === 'online') {
-      const mySymbol = gameState.players.X === user.uid ? 'X' : 'O';
-      if (gameState.currentPlayer !== mySymbol) return;
-    }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
 
-    const newBoard = [...gameState.board];
-    newBoard[index] = gameState.currentPlayer;
-    
-    const checkWinner = (b) => {
-      const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-      for (let l of lines) {
-        if (b[l[0]] && b[l[0]] === b[l[1]] && b[l[0]] === b[l[2]]) return b[l[0]];
-      }
-      return b.every(c => c) ? 'draw' : null;
-    };
+        .splash-logo {
+            animation: pulse 2s infinite;
+        }
 
-    const winResult = checkWinner(newBoard);
-    const updated = {
-      board: newBoard,
-      currentPlayer: gameState.currentPlayer === 'X' ? 'O' : 'X',
-      winner: winResult
-    };
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.7; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-6">
 
-    if (gameMode === 'online') {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomID), updated);
-    } else {
-      setGameState(prev => ({ ...prev, ...updated }));
-    }
-
-    if (winResult) {
-      if (winResult === 'draw') setScores(s => ({...s, draws: s.draws + 1}));
-      else setScores(s => ({...s, [winResult]: s[winResult] + 1}));
-    }
-  };
-
-  const createRoom = async () => {
-    const id = Math.floor(1000 + Math.random() * 9000).toString();
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id), {
-      board: Array(9).fill(null),
-      currentPlayer: 'X',
-      winner: null,
-      players: { X: user.uid, O: null },
-      status: 'waiting'
-    });
-    setRoomID(id);
-    setGameMode('online');
-    setScreen('searching');
-  };
-
-  const joinRoom = async (id) => {
-    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id);
-    const snap = await getDoc(roomRef);
-    if (snap.exists() && !snap.data().players.O) {
-      await updateDoc(roomRef, { 'players.O': user.uid, status: 'playing' });
-      setRoomID(id);
-      setGameMode('online');
-      setScreen('game');
-    }
-  };
-
-  const resetGame = async () => {
-    const reset = { board: Array(9).fill(null), currentPlayer: 'X', winner: null };
-    if (gameMode === 'online') await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomID), reset);
-    else setGameState(p => ({...p, ...reset}));
-  };
-
-  if (loading) {
-    return (
-      <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-[999] animate-in fade-in duration-500">
-        <div className="relative mb-8">
-          <div className="w-24 h-24 border-4 border-indigo-500 rounded-full animate-ping opacity-25"></div>
-          <div className="absolute inset-0 flex items-center justify-center">
-             <Zap className="text-indigo-400 fill-indigo-400 animate-bounce" size={48} />
-          </div>
+    <!-- SPLASH SCREEN -->
+    <div id="splash-screen" class="screen active fixed inset-0 flex-col items-center justify-center bg-slate-950 z-[100]">
+        <div class="splash-logo mb-6">
+            <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
         </div>
-        <h1 className="text-3xl font-black italic tracking-tighter text-white">FMK GAMES</h1>
-        <p className="text-[10px] text-indigo-500 font-bold tracking-[0.4em] uppercase mt-2">Loading Assets...</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6 font-sans overflow-hidden">
-      
-      {screen === 'home' && (
-        <div className="w-full max-w-sm flex flex-col gap-10 animate-in zoom-in duration-300">
-          <div className="flex justify-between items-center">
-            <button className="p-3 bg-white/5 border border-white/10 rounded-full text-slate-400"><Bell size={20}/></button>
-            <div className="text-center">
-               <h1 className="text-4xl font-black italic tracking-tighter leading-none">TIC TAC TOE</h1>
-               <span className="text-[8px] font-black text-indigo-500 tracking-[0.5em] uppercase">Connect & Play</span>
-            </div>
-            <button onClick={() => setShowSettings(true)} className="p-3 bg-white/5 border border-white/10 rounded-full text-slate-400"><Settings size={20}/></button>
-          </div>
-
-          <div className="space-y-4">
-            <button onClick={() => { setGameMode('pvp'); setScreen('game'); resetGame(); }} className="w-full p-6 bg-white/5 border border-white/10 rounded-[2rem] flex items-center justify-between group hover:bg-white/10 transition-all">
-               <div className="flex items-center gap-4 text-left">
-                  <div className="p-3 bg-indigo-500/20 rounded-2xl text-indigo-400"><X size={24}/></div>
-                  <div>
-                    <p className="font-black text-lg">Local 1v1</p>
-                    <p className="text-[10px] text-slate-500 uppercase font-bold">Offline Match</p>
-                  </div>
-               </div>
-               <ArrowLeft size={20} className="rotate-180 text-slate-600 group-hover:text-white" />
-            </button>
-
-            <button onClick={() => setScreen('lobby')} className="w-full p-6 bg-indigo-600/10 border border-indigo-500/30 rounded-[2rem] flex items-center justify-between group transition-all">
-               <div className="flex items-center gap-4 text-left">
-                  <div className="p-3 bg-indigo-500/20 rounded-2xl text-indigo-400"><Wifi size={24}/></div>
-                  <div>
-                    <p className="font-black text-lg">Hotspot Room</p>
-                    <p className="text-[10px] text-indigo-400 uppercase font-bold">Online Multiplayer</p>
-                  </div>
-               </div>
-               <div className="bg-indigo-600 text-[9px] px-2 py-1 rounded font-black animate-pulse">LIVE</div>
-            </button>
-
-            <button onClick={() => { setGameMode('ai'); setScreen('game'); resetGame(); }} className="w-full p-6 bg-white/5 border border-white/10 rounded-[2rem] flex items-center justify-between group transition-all">
-               <div className="flex items-center gap-4 text-left">
-                  <div className="p-3 bg-amber-500/20 rounded-2xl text-amber-400"><RefreshCw size={24}/></div>
-                  <div>
-                    <p className="font-black text-lg">Auto AI</p>
-                    <p className="text-[10px] text-slate-500 uppercase font-bold">Single Player</p>
-                  </div>
-               </div>
-               <ArrowLeft size={20} className="rotate-180 text-slate-600" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {screen === 'lobby' && (
-        <div className="w-full max-w-sm animate-in slide-in-from-right-10 duration-300">
-          <button onClick={() => setScreen('home')} className="mb-6 p-2 text-slate-400"><ArrowLeft/></button>
-          <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8 space-y-8">
-            <h2 className="text-2xl font-black italic">ROOM LOBBY</h2>
-            <div>
-              <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3">Host Session</p>
-              <button onClick={createRoom} className="w-full py-5 bg-indigo-600 rounded-2xl font-black flex items-center justify-center gap-2 shadow-xl shadow-indigo-600/20"><Share2 size={18}/> CREATE ROOM</button>
-            </div>
-            <div className="flex items-center gap-4"><div className="h-[1px] flex-1 bg-white/10"></div><span className="text-[10px] font-bold text-slate-600">OR</span><div className="h-[1px] flex-1 bg-white/10"></div></div>
-            <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Join Friend</p>
-              <div className="flex gap-2">
-                <input value={inputRoomID} onChange={e => setInputRoomID(e.target.value)} placeholder="ENTER ID" className="flex-1 bg-black/40 border border-white/10 rounded-2xl px-5 font-mono font-bold focus:outline-none focus:border-indigo-500" />
-                <button onClick={() => joinRoom(inputRoomID)} className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center"><Search/></button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {screen === 'searching' && (
-        <div className="flex flex-col items-center justify-center text-center gap-8">
-          <div className="w-40 h-40 border-8 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-          <div className="bg-white/5 p-8 rounded-[2.5rem] border border-white/10 w-full max-w-xs">
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Room ID</p>
-            <h2 className="text-5xl font-black tracking-widest mb-6 font-mono">{roomID}</h2>
-            <button onClick={() => navigator.clipboard.writeText(roomID)} className="flex items-center gap-2 mx-auto px-6 py-3 bg-indigo-600 rounded-xl text-xs font-black uppercase"><Copy size={16}/> Copy ID</button>
-          </div>
-          <button onClick={() => setScreen('home')} className="text-slate-500 font-bold uppercase text-xs tracking-widest underline decoration-2 underline-offset-8">Cancel Session</button>
-        </div>
-      )}
-
-      {screen === 'game' && (
-        <div className="w-full max-w-sm flex flex-col gap-8 animate-in slide-in-from-bottom-10 duration-500">
-          <div className="flex justify-between items-center px-2">
-            <button onClick={() => setScreen('home')} className="p-2 text-slate-400"><ArrowLeft/></button>
-            <div className="text-center">
-               <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">
-                  {gameState.winner ? (gameState.winner === 'draw' ? 'DRAW MATCH' : `PLAYER ${gameState.winner} WON`) : `Player ${gameState.currentPlayer} Turn`}
-               </p>
-               <p className="text-[8px] font-bold text-slate-600 uppercase">{gameMode === 'online' ? `Online: ${roomID}` : 'Local'}</p>
-            </div>
-            <button onClick={resetGame} className="p-2 text-slate-400"><RefreshCw size={20}/></button>
-          </div>
-
-          <div className="bg-white/5 border border-white/10 p-4 rounded-[3rem] aspect-square grid grid-cols-3 gap-4">
-             {gameState.board.map((cell, i) => (
-               <button key={i} onClick={() => handleMove(i)} className="bg-slate-900 rounded-3xl flex items-center justify-center transition-all active:scale-90 border-b-4 border-black relative">
-                 {cell === 'X' && <X className="text-indigo-500 drop-shadow-[0_0_10px_rgba(99,102,241,0.5)]" size={48} strokeWidth={4} />}
-                 {cell === 'O' && <Circle className="text-pink-500 drop-shadow-[0_0_10px_rgba(236,72,153,0.5)]" size={48} strokeWidth={4} />}
-               </button>
-             ))}
-          </div>
-
-          <div className="grid grid-cols-3 gap-3 px-2">
-            {[
-              { label: 'P1 (X)', val: scores.X },
-              { label: 'Draws', val: scores.draws },
-              { label: 'P2 (O)', val: scores.O }
-            ].map(item => (
-              <div key={item.label} className="bg-white/5 border border-white/10 rounded-2xl py-4 text-center">
-                 <p className="text-[8px] font-bold text-slate-500 uppercase mb-1">{item.label}</p>
-                 <p className="text-2xl font-black">{item.val}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {showSettings && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 flex items-center justify-center p-6" onClick={() => setShowSettings(false)}>
-           <div className="bg-slate-900 border border-white/10 w-full max-w-xs rounded-[3rem] p-10 animate-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
-              <h2 className="text-2xl font-black italic mb-8 flex items-center gap-3"><Settings/> SETTINGS</h2>
-              <div className="space-y-8">
-                 <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase text-slate-400">Audio SFX</span><div className="w-12 h-6 bg-indigo-600 rounded-full relative"><div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div></div></div>
-                 <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase text-slate-400">Background Music</span><div className="w-12 h-6 bg-indigo-600 rounded-full relative"><div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div></div></div>
-                 <div className="flex justify-between items-center"><span className="text-xs font-bold uppercase text-slate-400">Haptic Vibe</span><div className="w-12 h-6 bg-indigo-600 rounded-full relative"><div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div></div></div>
-              </div>
-              <button onClick={() => setShowSettings(false)} className="w-full mt-12 py-5 bg-indigo-600 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-indigo-600/30">Back to Game</button>
-           </div>
-        </div>
-      )}
+        <h1 class="text-4xl font-black italic tracking-tighter">FMK GAMES</h1>
+        <p class="text-[10px] text-indigo-500 font-bold tracking-[0.4em] uppercase mt-2">Initializing Battle...</p>
     </div>
-  );
-}
+
+    <!-- HOME SCREEN -->
+    <div id="home-screen" class="screen w-full max-w-sm flex-col gap-10">
+        <div class="text-center">
+            <h1 class="text-5xl font-black italic tracking-tighter">BATTLE HUB</h1>
+            <p class="text-[10px] text-indigo-500 font-bold tracking-[0.5em] uppercase">Mini Militia Style</p>
+        </div>
+
+        <div class="space-y-4">
+            <button onclick="startLocal()" class="w-full p-6 glass rounded-[2rem] flex items-center gap-4 text-left hover:bg-white/5">
+                <div class="p-3 bg-indigo-500/20 rounded-2xl text-indigo-400">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </div>
+                <div>
+                    <p class="font-black text-lg">Local Play</p>
+                    <p class="text-[10px] text-slate-500 font-bold uppercase">1v1 Same Device</p>
+                </div>
+            </button>
+
+            <button onclick="showLobby()" class="w-full p-6 bg-indigo-600 border border-indigo-400 rounded-[2rem] flex items-center gap-4 shadow-lg shadow-indigo-600/30">
+                <div class="p-3 bg-white/20 rounded-2xl text-white">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
+                </div>
+                <div>
+                    <p class="font-black text-lg">Hotspot Room</p>
+                    <p class="text-[10px] text-indigo-200 font-bold uppercase">Multiplayer Connect</p>
+                </div>
+            </button>
+        </div>
+    </div>
+
+    <!-- LOBBY SCREEN -->
+    <div id="lobby-screen" class="screen w-full max-w-sm flex-col gap-6">
+        <button onclick="showHome()" class="self-start text-slate-500"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+        <div class="glass p-8 rounded-[2.5rem] space-y-8">
+            <h2 class="text-2xl font-black italic uppercase">Multiplayer</h2>
+            <div>
+                <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3">Host</p>
+                <button onclick="createRoom()" class="w-full py-4 bg-indigo-600 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-indigo-600/20">Create Room</button>
+            </div>
+            <div class="flex items-center gap-4"><div class="h-[1px] flex-1 bg-white/10"></div><span class="text-[10px] font-bold text-slate-600">OR</span><div class="h-[1px] flex-1 bg-white/10"></div></div>
+            <div>
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Join Friend</p>
+                <div class="flex gap-2">
+                    <input id="join-input" type="text" placeholder="ROOM ID" class="flex-1 bg-black/40 border border-white/10 rounded-xl px-5 font-bold outline-none focus:border-indigo-500">
+                    <button onclick="joinRoom()" class="p-4 bg-white/10 rounded-xl hover:bg-white/20"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WAITING SCREEN -->
+    <div id="waiting-screen" class="screen flex-col items-center gap-8 text-center">
+        <div class="w-24 h-24 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+        <div class="glass p-8 rounded-[2.5rem] border-indigo-500/30">
+            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Room ID</p>
+            <h2 id="display-room-id" class="text-5xl font-black tracking-widest font-mono">0000</h2>
+        </div>
+        <button onclick="showHome()" class="text-slate-500 font-bold uppercase text-xs tracking-widest underline underline-offset-8">Cancel</button>
+    </div>
+
+    <!-- GAME SCREEN -->
+    <div id="game-screen" class="screen w-full max-w-sm flex-col gap-8">
+        <div class="flex justify-between items-center glass p-4 rounded-[2rem]">
+            <button onclick="showHome()" class="text-slate-500"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+            <div class="text-center">
+                <p id="turn-status" class="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Player X Turn</p>
+                <p id="room-tag" class="text-[8px] font-bold text-slate-600 uppercase">Local Match</p>
+            </div>
+            <button onclick="resetBoard()" class="text-slate-500"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
+        </div>
+
+        <div id="board" class="glass p-4 rounded-[3rem] aspect-square grid grid-cols-3 gap-3">
+            <!-- 9 Cells generated by JS -->
+        </div>
+    </div>
+
+    <script>
+        // --- Firebase Init ---
+        const config = JSON.parse(__firebase_config);
+        firebase.initializeApp(config);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-fmk';
+
+        let user = null;
+        let gameMode = 'local'; // 'local' or 'online'
+        let roomID = null;
+        let boardState = Array(9).fill(null);
+        let currentPlayer = 'X';
+        let winner = null;
+        let unsubscribe = null;
+
+        // --- Auth Setup ---
+        async function initAuth() {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await auth.signInWithCustomToken(__initial_auth_token);
+            } else {
+                await auth.signInAnonymously();
+            }
+            user = auth.currentUser;
+        }
+
+        // --- Navigation ---
+        function switchScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function showHome() { 
+            if (unsubscribe) unsubscribe();
+            switchScreen('home-screen'); 
+        }
+        function showLobby() { switchScreen('lobby-screen'); }
+
+        // --- Game Logic ---
+        function createBoard() {
+            const boardEl = document.getElementById('board');
+            boardEl.innerHTML = '';
+            boardState.forEach((val, i) => {
+                const cell = document.createElement('button');
+                cell.className = 'cell rounded-[1.5rem] flex items-center justify-center text-4xl font-black';
+                if (val === 'X') cell.innerHTML = '<span class="text-indigo-500">X</span>';
+                if (val === 'O') cell.innerHTML = '<span class="text-pink-500">O</span>';
+                cell.onclick = () => handleMove(i);
+                boardEl.appendChild(cell);
+            });
+        }
+
+        function checkWinner(b) {
+            const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+            for (let [a,b1,c] of lines) {
+                if (b[a] && b[a] === b[b1] && b[a] === b[c]) return b[a];
+            }
+            return b.every(v => v) ? 'draw' : null;
+        }
+
+        async function handleMove(i) {
+            if (boardState[i] || winner) return;
+
+            if (gameMode === 'online') {
+                const snap = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(roomID).get();
+                const data = snap.data();
+                const mySymbol = data.players.X === user.uid ? 'X' : 'O';
+                if (data.currentPlayer !== mySymbol) return;
+            }
+
+            boardState[i] = currentPlayer;
+            winner = checkWinner(boardState);
+            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+
+            if (gameMode === 'online') {
+                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(roomID).update({
+                    board: boardState,
+                    currentPlayer: currentPlayer,
+                    winner: winner
+                });
+            } else {
+                updateUI();
+            }
+        }
+
+        function updateUI() {
+            createBoard();
+            const status = document.getElementById('turn-status');
+            if (winner) {
+                status.innerText = winner === 'draw' ? "IT'S A DRAW!" : `PLAYER ${winner} WINS!`;
+                status.classList.add('text-amber-400');
+            } else {
+                status.innerText = `Player ${currentPlayer} Turn`;
+                status.classList.remove('text-amber-400');
+            }
+        }
+
+        function resetBoard() {
+            boardState = Array(9).fill(null);
+            currentPlayer = 'X';
+            winner = null;
+            if (gameMode === 'online') {
+                db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(roomID).update({
+                    board: boardState, currentPlayer: 'X', winner: null
+                });
+            } else {
+                updateUI();
+            }
+        }
+
+        // --- Network Actions ---
+        function startLocal() {
+            gameMode = 'local';
+            document.getElementById('room-tag').innerText = 'Local Match';
+            resetBoard();
+            switchScreen('game-screen');
+        }
+
+        async function createRoom() {
+            gameMode = 'online';
+            roomID = Math.floor(1000 + Math.random() * 9000).toString();
+            document.getElementById('display-room-id').innerText = roomID;
+            document.getElementById('room-tag').innerText = `Room: ${roomID}`;
+            
+            await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(roomID).set({
+                board: Array(9).fill(null),
+                currentPlayer: 'X',
+                winner: null,
+                players: { X: user.uid, O: null },
+                status: 'waiting'
+            });
+
+            switchScreen('waiting-screen');
+            listenToRoom();
+        }
+
+        async function joinRoom() {
+            const id = document.getElementById('join-input').value;
+            if (!id) return;
+            const ref = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(id);
+            const snap = await ref.get();
+            
+            if (snap.exists() && !snap.data().players.O) {
+                gameMode = 'online';
+                roomID = id;
+                document.getElementById('room-tag').innerText = `Room: ${id}`;
+                await ref.update({ 'players.O': user.uid, status: 'playing' });
+                switchScreen('game-screen');
+                listenToRoom();
+            }
+        }
+
+        function listenToRoom() {
+            if (unsubscribe) unsubscribe();
+            unsubscribe = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(roomID)
+                .onSnapshot(snap => {
+                    if (!snap.exists()) return;
+                    const data = snap.data();
+                    boardState = data.board;
+                    currentPlayer = data.currentPlayer;
+                    winner = data.winner;
+                    
+                    if (data.status === 'playing' && document.getElementById('waiting-screen').classList.contains('active')) {
+                        switchScreen('game-screen');
+                    }
+                    updateUI();
+                });
+        }
+
+        // --- Boot ---
+        window.onload = async () => {
+            await initAuth();
+            setTimeout(() => {
+                switchScreen('home-screen');
+            }, 2500);
+        };
+    </script>
+</body>
+</html>
 
