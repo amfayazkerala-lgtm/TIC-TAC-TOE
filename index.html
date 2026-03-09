@@ -2,151 +2,122 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Tic-Tac-Toe Pro | FMK</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;700&display=swap');
         
+        :root {
+            --primary: #6366f1;
+            --secondary: #ec4899;
+        }
+
         body {
-            font-family: 'Poppins', sans-serif;
-            background: radial-gradient(circle at top, #1e293b, #020617);
+            font-family: 'Inter', sans-serif;
+            background: #020617;
             color: white;
             height: 100vh;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             overflow: hidden;
             touch-action: manipulation;
         }
 
+        h1, h2 { font-family: 'Orbitron', sans-serif; }
+
         .neo-glass {
             background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(12px);
+            backdrop-filter: blur(15px);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         }
 
         .tic-cell {
-            background: rgba(15, 23, 42, 0.8);
+            background: #0f172a;
             border-bottom: 5px solid #000;
-            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            font-weight: 900;
+            transition: 0.1s;
         }
 
-        .tic-cell:active {
-            border-bottom-width: 0;
-            transform: translateY(4px);
-        }
+        .tic-cell:active { border-bottom-width: 0; transform: translateY(4px); }
 
-        .x-text {
-            color: #6366f1;
-            text-shadow: 0 0 15px rgba(99, 102, 241, 0.8);
-        }
-
-        .o-text {
-            color: #ec4899;
-            text-shadow: 0 0 15px rgba(236, 72, 153, 0.8);
-        }
+        .x-glow { color: var(--primary); text-shadow: 0 0 15px var(--primary); }
+        .o-glow { color: var(--secondary); text-shadow: 0 0 15px var(--secondary); }
 
         .screen {
             display: none;
             width: 100%;
             max-width: 400px;
             flex-direction: column;
-            animation: slideUp 0.5s ease-out;
+            padding: 20px;
+            animation: fadeIn 0.3s ease-in;
         }
 
-        .screen.active {
-            display: flex;
-        }
+        .screen.active { display: flex; }
 
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
         .loader {
-            width: 48px;
-            height: 48px;
-            border: 5px solid #FFF;
-            border-bottom-color: #6366f1;
+            width: 30px;
+            height: 30px;
+            border: 3px solid #1e293b;
+            border-top: 3px solid var(--primary);
             border-radius: 50%;
-            display: inline-block;
-            box-sizing: border-box;
-            animation: rotation 1s linear infinite;
+            animation: spin 1s linear infinite;
         }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
 
-        @keyframes rotation {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+        .btn-disabled { opacity: 0.5; pointer-events: none; }
     </style>
 </head>
-<body class="flex items-center justify-center p-4">
+<body>
 
-    <!-- SPLASH SCREEN -->
+    <!-- SPLASH -->
     <div id="splash" class="screen active items-center text-center">
-        <div class="mb-8 relative">
-            <div class="w-24 h-24 bg-indigo-600/20 rounded-3xl rotate-12 absolute animate-pulse"></div>
-            <svg class="relative z-10" width="96" height="96" viewBox="0 0 24 24" fill="#6366f1"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-        </div>
-        <h1 class="text-4xl font-black tracking-tighter italic">FMK GAMES</h1>
-        <div class="mt-12 loader"></div>
+        <svg width="60" height="60" viewBox="0 0 24 24" fill="var(--primary)" class="mb-6"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        <h1 class="text-2xl font-black italic mb-4">FMK GAMES</h1>
+        <div class="loader"></div>
     </div>
 
-    <!-- MAIN MENU -->
-    <div id="menu" class="screen gap-8">
-        <div class="text-center">
-            <h1 class="text-5xl font-black italic tracking-tighter mb-2">BATTLE HUB</h1>
-            <p class="text-xs font-bold text-indigo-400 tracking-[0.3em] uppercase">Multiplayer Edition</p>
-        </div>
+    <!-- MENU -->
+    <div id="menu" class="screen gap-4">
+        <h1 class="text-center text-3xl font-black x-glow mb-6 italic">BATTLE HUB</h1>
+        
+        <button onclick="startLocal()" class="neo-glass p-6 rounded-2xl flex items-center gap-4 active:bg-white/10">
+            <div class="w-12 h-12 bg-slate-800 rounded-lg flex items-center justify-center">🤝</div>
+            <div class="text-left"><h3 class="font-bold">Local 1v1</h3><p class="text-[10px] text-slate-500">Same Phone</p></div>
+        </button>
 
-        <div class="flex flex-col gap-4">
-            <button onclick="startLocal()" class="neo-glass p-6 rounded-[2rem] flex items-center gap-5 hover:bg-white/5 transition-all group">
-                <div class="w-14 h-14 rounded-2xl bg-indigo-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                </div>
-                <div class="text-left">
-                    <h3 class="font-bold text-lg">Local Play</h3>
-                    <p class="text-[10px] text-slate-500 font-bold uppercase">ഒരാൾക്കൊപ്പം കളിക്കാം</p>
-                </div>
-            </button>
-
-            <button onclick="switchScreen('lobby')" class="bg-indigo-600 p-6 rounded-[2rem] flex items-center gap-5 shadow-lg shadow-indigo-600/30 active:scale-95 transition-all">
-                <div class="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
-                </div>
-                <div class="text-left">
-                    <h3 class="font-bold text-lg text-white">Online Room</h3>
-                    <p class="text-[10px] text-indigo-200 font-bold uppercase">ദൂരെയുള്ള കൂട്ടുകാരനൊപ്പം</p>
-                </div>
-            </button>
-        </div>
+        <button id="online-btn" onclick="switchScreen('lobby')" class="neo-glass p-6 rounded-2xl flex items-center gap-4 active:bg-white/10 btn-disabled">
+            <div class="w-12 h-12 bg-indigo-900 rounded-lg flex items-center justify-center">🌐</div>
+            <div class="text-left">
+                <h3 class="font-bold">Online Match</h3>
+                <p id="net-status" class="text-[10px] text-red-500 font-bold">CONNECTING...</p>
+            </div>
+        </button>
     </div>
 
     <!-- LOBBY -->
     <div id="lobby" class="screen gap-6">
         <div class="flex items-center gap-4">
-            <button onclick="switchScreen('menu')" class="p-3 neo-glass rounded-2xl text-slate-400">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            </button>
-            <h2 class="text-2xl font-black italic uppercase">Lobby</h2>
+            <button onclick="switchScreen('menu')" class="p-2 neo-glass rounded-lg">Back</button>
+            <h2 class="text-xl font-bold">LOBBY</h2>
         </div>
-
-        <div class="neo-glass p-8 rounded-[2.5rem] space-y-8">
-            <button onclick="createRoom()" class="w-full py-5 bg-indigo-600 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-indigo-600/20 active:scale-95 transition-all">Host Room</button>
-            
-            <div class="relative flex items-center">
-                <div class="flex-grow border-t border-white/10"></div>
-                <span class="flex-shrink mx-4 text-[10px] font-bold text-slate-500 uppercase">Or Join</span>
-                <div class="flex-grow border-t border-white/10"></div>
-            </div>
-
+        <div class="neo-glass p-6 rounded-3xl space-y-6">
+            <button onclick="createRoom()" class="w-full py-4 bg-indigo-600 rounded-xl font-bold uppercase active:scale-95">Host Match</button>
             <div class="flex gap-2">
-                <input id="join-input" type="number" placeholder="Enter ID" class="flex-1 bg-black/40 border border-white/10 rounded-2xl px-5 font-bold outline-none focus:border-indigo-500 h-14">
-                <button onclick="joinRoom()" class="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center hover:bg-white/20 transition-colors">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                </button>
+                <input id="join-input" type="number" placeholder="Enter ID" class="flex-1 bg-black rounded-xl px-4 text-center font-bold outline-none focus:border-indigo-500 h-12">
+                <button onclick="joinRoom()" class="px-6 bg-white/10 rounded-xl font-bold">Join</button>
             </div>
         </div>
     </div>
@@ -154,703 +125,192 @@
     <!-- WAITING -->
     <div id="waiting" class="screen items-center text-center gap-8">
         <div class="loader"></div>
-        <div class="neo-glass p-10 rounded-[3rem] border-indigo-500/30">
-            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Room Code</p>
-            <h2 id="room-code" class="text-6xl font-black tracking-widest font-mono">----</h2>
+        <div class="neo-glass p-10 rounded-3xl w-full">
+            <p class="text-[10px] text-indigo-400 mb-2 font-bold">ROOM CODE</p>
+            <h2 id="room-code" class="text-5xl font-black tracking-widest">----</h2>
         </div>
-        <p class="text-sm text-slate-400 max-w-[200px]">ഈ ഐഡി കൂട്ടുകാരന് അയച്ചു കൊടുക്കുക</p>
-        <button onclick="switchScreen('menu')" class="text-slate-500 font-bold uppercase text-xs tracking-[0.2em] underline">Cancel</button>
+        <button onclick="switchScreen('menu')" class="text-slate-500 font-bold text-xs uppercase underline">Cancel</button>
     </div>
 
     <!-- GAME -->
-    <div id="game" class="screen gap-6">
-        <div class="flex justify-between items-center neo-glass p-4 rounded-3xl">
+    <div id="game" class="screen gap-4">
+        <div class="flex justify-between items-center neo-glass p-3 rounded-xl">
             <div class="flex flex-col">
-                <p id="turn-text" class="text-[10px] font-black x-text uppercase tracking-widest">Player X Turn</p>
-                <p id="room-id-tag" class="text-[8px] font-bold text-slate-500 uppercase">Local Match</p>
+                <p id="turn-text" class="text-xs font-bold x-glow">Turn: X</p>
+                <p id="room-id-tag" class="text-[8px] text-slate-500">Local</p>
             </div>
-            <button onclick="resetGame()" class="p-3 bg-white/5 rounded-2xl text-slate-400">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-            </button>
+            <button onclick="resetGame()" class="px-4 py-2 bg-white/5 rounded-lg text-xs">Reset</button>
         </div>
-
-        <div id="board" class="neo-glass p-4 rounded-[3rem] aspect-square grid grid-cols-3 gap-3">
-            <!-- Board cells here -->
-        </div>
-
-        <div class="grid grid-cols-3 gap-3">
-            <div class="neo-glass py-4 rounded-2xl text-center">
-                <p class="text-[9px] font-bold text-slate-500 uppercase mb-1">X Score</p>
-                <p id="score-x" class="text-2xl font-black x-text">0</p>
-            </div>
-            <div class="neo-glass py-4 rounded-2xl text-center">
-                <p class="text-[9px] font-bold text-slate-500 uppercase mb-1">Draw</p>
-                <p id="score-draws" class="text-2xl font-black">0</p>
-            </div>
-            <div class="neo-glass py-4 rounded-2xl text-center">
-                <p class="text-[9px] font-bold text-slate-500 uppercase mb-1">O Score</p>
-                <p id="score-o" class="text-2xl font-black o-text">0</p>
-            </div>
+        <div id="board" class="grid grid-cols-3 gap-3 aspect-square neo-glass p-3 rounded-3xl"></div>
+        <div class="grid grid-cols-3 gap-2">
+            <div class="neo-glass py-2 rounded-xl text-center"><p class="text-[8px] text-slate-500 uppercase">X</p><p id="score-x" class="font-black x-glow">0</p></div>
+            <div class="neo-glass py-2 rounded-xl text-center"><p class="text-[8px] text-slate-500 uppercase">D</p><p id="score-draws" class="font-black">0</p></div>
+            <div class="neo-glass py-2 rounded-xl text-center"><p class="text-[8px] text-slate-500 uppercase">O</p><p id="score-o" class="font-black o-glow">0</p></div>
         </div>
     </div>
 
     <script>
-        // --- Firebase Core ---
-        const config = JSON.parse(__firebase_config);
-        firebase.initializeApp(config);
+        const firebaseConfig = JSON.parse(__firebase_config);
+        firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
         const auth = firebase.auth();
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'fmk-pro-tac';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'fmk-tac-v4';
 
-        let user = null;
-        let gameMode = 'local';
-        let currentRoom = null;
-        let boardState = Array(9).fill(null);
-        let turn = 'X';
-        let winner = null;
-        let scores = { X: 0, O: 0, draw: 0 };
-        let unsubscribe = null;
+        let user = null, gameMode = 'local', currentRoom = null, boardState = Array(9).fill(null);
+        let turn = 'X', winner = null, scores = { X: 0, O: 0, draw: 0 }, unsubscribe = null;
 
-        // --- Init ---
-        async function startApp() {
+        async function initAuth() {
             try {
+                // Rule 3: Wait for Auth FIRST
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await auth.signInWithCustomToken(__initial_auth_token);
                 } else {
                     await auth.signInAnonymously();
                 }
                 user = auth.currentUser;
-                setTimeout(() => switchScreen('menu'), 2500);
-            } catch (err) { console.error(err); }
+                
+                // Connection successful
+                document.getElementById('online-btn').classList.remove('btn-disabled');
+                document.getElementById('net-status').innerText = 'READY';
+                document.getElementById('net-status').className = 'text-[10px] text-green-500 font-bold';
+                
+                setTimeout(() => switchScreen('menu'), 1500);
+            } catch (e) {
+                console.error(e);
+                document.getElementById('net-status').innerText = 'OFFLINE MODE';
+                setTimeout(() => switchScreen('menu'), 1500);
+            }
         }
 
         function switchScreen(id) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(id).classList.add('active');
-            if(id === 'menu' && unsubscribe) unsubscribe();
+            if (id === 'menu' && unsubscribe) { unsubscribe(); unsubscribe = null; }
         }
 
-        // --- Board Logic ---
         function renderBoard() {
             const board = document.getElementById('board');
             board.innerHTML = '';
             boardState.forEach((cell, i) => {
                 const btn = document.createElement('button');
-                btn.className = 'tic-cell rounded-[1.8rem] flex items-center justify-center text-5xl font-black';
-                if (cell === 'X') btn.innerHTML = '<span class="x-text">X</span>';
-                if (cell === 'O') btn.innerHTML = '<span class="o-text">O</span>';
+                btn.className = 'tic-cell';
+                if (cell === 'X') btn.innerHTML = '<span class="x-glow">X</span>';
+                if (cell === 'O') btn.innerHTML = '<span class="o-glow">O</span>';
                 btn.onclick = () => makeMove(i);
                 board.appendChild(btn);
             });
-            updateStatus();
-        }
-
-        function updateStatus() {
             const status = document.getElementById('turn-text');
             if (winner) {
-                status.innerText = winner === 'draw' ? ' സമനില !' : winner + ' ജയിച്ചു !';
-                status.className = `text-[10px] font-black uppercase tracking-widest ${winner === 'X' ? 'x-text' : winner === 'O' ? 'o-text' : 'text-white'}`;
+                status.innerText = winner === 'draw' ? "DRAW!" : `WINNER: ${winner}`;
+                status.className = `text-xs font-bold uppercase ${winner === 'X' ? 'x-glow' : 'o-glow'}`;
             } else {
-                status.innerText = `Player ${turn} Turn`;
-                status.className = `text-[10px] font-black uppercase tracking-widest ${turn === 'X' ? 'x-text' : 'o-text'}`;
+                status.innerText = `Turn: ${turn}`;
+                status.className = `text-xs font-bold uppercase ${turn === 'X' ? 'x-glow' : 'o-glow'}`;
             }
         }
 
         async function makeMove(i) {
-            if (boardState[i] || winner) return;
-
+            if (boardState[i] || winner || !user) return;
+            
             if (gameMode === 'online') {
-                const snap = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(currentRoom).get();
-                const data = snap.data();
-                const myMark = data.players.X === user.uid ? 'X' : 'O';
-                if (data.turn !== myMark || data.status !== 'playing') return;
+                const roomRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(currentRoom);
+                const snap = await roomRef.get();
+                const d = snap.data();
+                const mySymbol = d.players.X === user.uid ? 'X' : 'O';
+                if (d.turn !== mySymbol || d.status !== 'playing') return;
             }
 
             boardState[i] = turn;
             const win = checkWin(boardState);
-            const nextTurn = turn === 'X' ? 'O' : 'X';
+            const next = turn === 'X' ? 'O' : 'X';
 
             if (gameMode === 'online') {
-                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(currentRoom).update({
-                    board: boardState,
-                    turn: nextTurn,
-                    winner: win
-                });
+                const roomRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(currentRoom);
+                await roomRef.update({ board: boardState, turn: next, winner: win });
             } else {
-                turn = nextTurn;
-                winner = win;
-                if(winner) updateScores(winner);
+                turn = next; winner = win;
+                if(winner) { scores[winner === 'draw' ? 'draw' : winner]++; updateScores(); }
                 renderBoard();
             }
         }
 
         function checkWin(b) {
             const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-            for (let [a,b1,c] of lines) {
-                if (b[a] && b[a] === b[b1] && b[a] === b[c]) return b[a];
-            }
+            for (let [a,b1,c] of lines) if (b[a] && b[a] === b[b1] && b[a] === b[c]) return b[a];
             return b.every(v => v) ? 'draw' : null;
         }
 
-        function updateScores(w) {
-            scores[w]++;
+        function updateScores() {
             document.getElementById('score-x').innerText = scores.X;
             document.getElementById('score-o').innerText = scores.O;
             document.getElementById('score-draws').innerText = scores.draw;
         }
 
         function resetGame() {
-            boardState = Array(9).fill(null);
-            turn = 'X';
-            winner = null;
+            boardState = Array(9).fill(null); turn = 'X'; winner = null;
             if (gameMode === 'online') {
-                db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(currentRoom).update({
-                    board: boardState, turn: 'X', winner: null
-                });
-            } else {
-                renderBoard();
-            }
+                db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(currentRoom).update({ board: boardState, turn: 'X', winner: null });
+            } else renderBoard();
         }
 
-        // --- Online Logic ---
-        function startLocal() {
-            gameMode = 'local';
-            currentRoom = null;
-            boardState = Array(9).fill(null);
-            turn = 'X';
-            winner = null;
-            document.getElementById('room-id-tag').innerText = 'Local Match';
-            renderBoard();
-            switchScreen('game');
+        function startLocal() { 
+            gameMode = 'local'; 
+            document.getElementById('room-id-tag').innerText = 'Local'; 
+            resetGame(); 
+            switchScreen('game'); 
         }
 
         async function createRoom() {
+            if(!user) return;
             gameMode = 'online';
             const rid = Math.floor(1000 + Math.random() * 9000).toString();
             currentRoom = rid;
             document.getElementById('room-code').innerText = rid;
-            document.getElementById('room-id-tag').innerText = 'Room: ' + rid;
+            document.getElementById('room-id-tag').innerText = `ID: ${rid}`;
             
-            await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(rid).set({
-                board: Array(9).fill(null),
-                turn: 'X',
-                winner: null,
-                players: { X: user.uid, O: null },
-                status: 'waiting'
+            const roomRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(rid);
+            await roomRef.set({
+                board: Array(9).fill(null), turn: 'X', winner: null, players: { X: user.uid, O: null }, status: 'waiting'
             });
             
             switchScreen('waiting');
-            listenRoom(rid);
+            listen(rid);
         }
 
         async function joinRoom() {
+            if(!user) return;
             const rid = document.getElementById('join-input').value;
             if(!rid) return;
-            const ref = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(rid);
-            const snap = await ref.get();
+            const roomRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(rid);
+            const snap = await roomRef.get();
+            
             if(snap.exists() && !snap.data().players.O) {
-                gameMode = 'online';
-                currentRoom = rid;
-                document.getElementById('room-id-tag').innerText = 'Room: ' + rid;
-                await ref.update({ 'players.O': user.uid, status: 'playing' });
+                gameMode = 'online'; currentRoom = rid;
+                document.getElementById('room-id-tag').innerText = `ID: ${rid}`;
+                await roomRef.update({ 'players.O': user.uid, status: 'playing' });
                 switchScreen('game');
-                listenRoom(rid);
+                listen(rid);
             }
         }
 
-        function listenRoom(rid) {
+        function listen(rid) {
             if (unsubscribe) unsubscribe();
-            unsubscribe = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(rid)
-                .onSnapshot(snap => {
-                    if(!snap.exists()) return;
-                    const data = snap.data();
-                    boardState = data.board;
-                    turn = data.turn;
-                    const oldWin = winner;
-                    winner = data.winner;
-                    if(winner && winner !== oldWin) updateScores(winner);
-
-                    if(data.status === 'playing' && document.getElementById('waiting').classList.contains('active')) {
-                        switchScreen('game');
-                    }
-                    renderBoard();
-                });
-        }
-
-        window.onload = startApp;
-    </script>
-</body>
-</html>
-
-        <button onclick="showHome()" class="p-2 text-slate-500"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
-        <div class="glass p-8 rounded-[2.5rem] space-y-8">
-            <h2 class="text-2xl font-black italic uppercase">Lobby</h2>
-            <button onclick="createRoom()" class="w-full py-5 bg-indigo-600 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-indigo-600/20 active:scale-95 transition-all">Host Room</button>
-            <div class="flex items-center gap-4"><div class="h-[1px] flex-1 bg-white/10"></div><span class="text-[10px] font-bold text-slate-600 uppercase">Join Friend</span><div class="h-[1px] flex-1 bg-white/10"></div></div>
-            <div class="flex gap-2">
-                <input id="join-input" type="number" placeholder="ENTER ID" class="flex-1 bg-black/40 border border-white/10 rounded-2xl px-5 font-bold outline-none focus:border-indigo-500 h-14">
-                <button onclick="joinRoom()" class="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center hover:bg-white/20"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></button>
-            </div>
-        </div>
-    </div>
-
-    <!-- WAITING SCREEN -->
-    <div id="waiting-screen" class="screen flex-col items-center gap-8 text-center">
-        <div class="relative">
-            <div class="w-32 h-32 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-            <div class="absolute inset-0 flex items-center justify-center font-black text-indigo-400">...</div>
-        </div>
-        <div class="glass p-8 rounded-[3rem] border-indigo-500/30 min-w-[200px]">
-            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Room ID</p>
-            <h2 id="display-room-id" class="text-6xl font-black tracking-[0.2em] font-mono text-white">0000</h2>
-        </div>
-        <button onclick="showHome()" class="text-slate-500 font-bold uppercase text-xs tracking-[0.3em] underline underline-offset-8">Cancel Hub</button>
-    </div>
-
-    <!-- GAME SCREEN -->
-    <div id="game-screen" class="screen w-full max-w-sm flex-col gap-6">
-        <div class="flex justify-between items-center glass p-4 rounded-[2rem]">
-            <button onclick="showHome()" class="p-2 text-slate-500"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
-            <div class="text-center">
-                <p id="turn-status" class="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Player X Turn</p>
-                <p id="room-tag" class="text-[8px] font-bold text-slate-600 uppercase">Local Match</p>
-            </div>
-            <button onclick="resetBoard()" class="p-2 text-slate-500"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
-        </div>
-
-        <div id="board" class="glass p-4 rounded-[3rem] aspect-square grid grid-cols-3 gap-3">
-            <!-- 9 Cells generated by JS -->
-        </div>
-
-        <div class="grid grid-cols-3 gap-3">
-            <div class="glass py-3 rounded-2xl text-center">
-                <p class="text-[8px] font-bold text-slate-500 uppercase">P1 (X)</p>
-                <p id="score-x" class="text-xl font-black">0</p>
-            </div>
-            <div class="glass py-3 rounded-2xl text-center">
-                <p class="text-[8px] font-bold text-slate-500 uppercase">Draws</p>
-                <p id="score-draw" class="text-xl font-black">0</p>
-            </div>
-            <div class="glass py-3 rounded-2xl text-center">
-                <p class="text-[8px] font-bold text-slate-500 uppercase">P2 (O)</p>
-                <p id="score-o" class="text-xl font-black">0</p>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        // --- Firebase Init ---
-        const config = JSON.parse(__firebase_config);
-        firebase.initializeApp(config);
-        const db = firebase.firestore();
-        const auth = firebase.auth();
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'fmk-tictac-pro';
-
-        let user = null;
-        let gameMode = 'local';
-        let roomID = null;
-        let boardState = Array(9).fill(null);
-        let currentPlayer = 'X';
-        let winner = null;
-        let unsubscribe = null;
-        let scores = { X: 0, O: 0, draw: 0 };
-
-        // --- Auth Setup ---
-        async function initAuth() {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await auth.signInWithCustomToken(__initial_auth_token);
-                } else {
-                    await auth.signInAnonymously();
+            const roomRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(rid);
+            unsubscribe = roomRef.onSnapshot(s => {
+                if(!s.exists()) return;
+                const d = s.data();
+                boardState = d.board; turn = d.turn;
+                if(d.winner && d.winner !== winner) { 
+                    scores[d.winner === 'draw' ? 'draw' : d.winner]++; 
+                    updateScores(); 
                 }
-                user = auth.currentUser;
-            } catch (e) { console.error("Auth failed", e); }
-        }
-
-        // --- Navigation ---
-        function switchScreen(id) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-        }
-
-        function showHome() { 
-            if (unsubscribe) unsubscribe();
-            switchScreen('home-screen'); 
-        }
-        function showLobby() { switchScreen('lobby-screen'); }
-
-        // --- Game Logic ---
-        function createBoard() {
-            const boardEl = document.getElementById('board');
-            boardEl.innerHTML = '';
-            boardState.forEach((val, i) => {
-                const cell = document.createElement('button');
-                cell.className = 'cell rounded-[1.8rem] flex items-center justify-center text-5xl font-black';
-                if (val === 'X') cell.innerHTML = '<span class="text-indigo-500" style="text-shadow: 0 0 15px rgba(99,102,241,0.5)">X</span>';
-                if (val === 'O') cell.innerHTML = '<span class="text-pink-500" style="text-shadow: 0 0 15px rgba(236,72,153,0.5)">O</span>';
-                cell.onclick = () => handleMove(i);
-                boardEl.appendChild(cell);
+                winner = d.winner;
+                if(d.status === 'playing' && document.getElementById('waiting').classList.contains('active')) switchScreen('game');
+                renderBoard();
             });
         }
 
-        function checkWinner(b) {
-            const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-            for (let [a,b1,c] of lines) {
-                if (b[a] && b[a] === b[b1] && b[a] === b[c]) return b[a];
-            }
-            return b.every(v => v) ? 'draw' : null;
-        }
-
-        async function handleMove(i) {
-            if (boardState[i] || winner) return;
-
-            if (gameMode === 'online') {
-                const snap = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(roomID).get();
-                const data = snap.data();
-                const mySymbol = data.players.X === user.uid ? 'X' : 'O';
-                if (data.currentPlayer !== mySymbol || data.status !== 'playing') return;
-            }
-
-            boardState[i] = currentPlayer;
-            winner = checkWinner(boardState);
-            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
-
-            if (gameMode === 'online') {
-                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(roomID).update({
-                    board: boardState,
-                    currentPlayer: currentPlayer,
-                    winner: winner
-                });
-            } else {
-                if (winner) updateScores(winner);
-                updateUI();
-            }
-        }
-
-        function updateScores(w) {
-            scores[w]++;
-            document.getElementById('score-x').innerText = scores.X;
-            document.getElementById('score-o').innerText = scores.O;
-            document.getElementById('score-draw').innerText = scores.draw;
-        }
-
-        function updateUI() {
-            createBoard();
-            const status = document.getElementById('turn-status');
-            if (winner) {
-                status.innerText = winner === 'draw' ? "DRAW MATCH!" : `PLAYER ${winner} WINS!`;
-                status.className = "text-[10px] font-black uppercase tracking-widest " + (winner === 'X' ? 'text-indigo-400' : winner === 'O' ? 'text-pink-400' : 'text-amber-400');
-            } else {
-                status.innerText = `Player ${currentPlayer} Turn`;
-                status.className = "text-[10px] font-black uppercase tracking-widest text-indigo-400";
-            }
-        }
-
-        function resetBoard() {
-            boardState = Array(9).fill(null);
-            currentPlayer = 'X';
-            winner = null;
-            if (gameMode === 'online') {
-                db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(roomID).update({
-                    board: boardState, currentPlayer: 'X', winner: null
-                });
-            } else {
-                updateUI();
-            }
-        }
-
-        // --- Network Actions ---
-        function startLocal() {
-            gameMode = 'local';
-            document.getElementById('room-tag').innerText = 'Local Match';
-            resetBoard();
-            switchScreen('game-screen');
-        }
-
-        async function createRoom() {
-            gameMode = 'online';
-            roomID = Math.floor(1000 + Math.random() * 9000).toString();
-            document.getElementById('display-room-id').innerText = roomID;
-            document.getElementById('room-tag').innerText = `Room: ${roomID}`;
-            
-            await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(roomID).set({
-                board: Array(9).fill(null),
-                currentPlayer: 'X',
-                winner: null,
-                players: { X: user.uid, O: null },
-                status: 'waiting'
-            });
-
-            switchScreen('waiting-screen');
-            listenToRoom();
-        }
-
-        async function joinRoom() {
-            const id = document.getElementById('join-input').value;
-            if (!id) return;
-            const ref = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(id);
-            const snap = await ref.get();
-            
-            if (snap.exists() && !snap.data().players.O) {
-                gameMode = 'online';
-                roomID = id;
-                document.getElementById('room-tag').innerText = `Room: ${id}`;
-                await ref.update({ 'players.O': user.uid, status: 'playing' });
-                switchScreen('game-screen');
-                listenToRoom();
-            }
-        }
-
-        function listenToRoom() {
-            if (unsubscribe) unsubscribe();
-            unsubscribe = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(roomID)
-                .onSnapshot(snap => {
-                    if (!snap.exists()) return;
-                    const data = snap.data();
-                    boardState = data.board;
-                    currentPlayer = data.currentPlayer;
-                    const oldWinner = winner;
-                    winner = data.winner;
-                    
-                    if (winner && winner !== oldWinner) updateScores(winner);
-
-                    if (data.status === 'playing' && document.getElementById('waiting-screen').classList.contains('active')) {
-                        switchScreen('game-screen');
-                    }
-                    updateUI();
-                });
-        }
-
-        // --- Boot ---
-        window.onload = async () => {
-            await initAuth();
-            // Forced transition after splash
-            setTimeout(() => {
-                switchScreen('home-screen');
-            }, 2500);
-        };
-    </script>
-</body>
-</html>
-
-            <h2 class="text-2xl font-black italic uppercase">Multiplayer</h2>
-            <div>
-                <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3">Host</p>
-                <button onclick="createRoom()" class="w-full py-4 bg-indigo-600 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-indigo-600/20">Create Room</button>
-            </div>
-            <div class="flex items-center gap-4"><div class="h-[1px] flex-1 bg-white/10"></div><span class="text-[10px] font-bold text-slate-600">OR</span><div class="h-[1px] flex-1 bg-white/10"></div></div>
-            <div>
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Join Friend</p>
-                <div class="flex gap-2">
-                    <input id="join-input" type="text" placeholder="ROOM ID" class="flex-1 bg-black/40 border border-white/10 rounded-xl px-5 font-bold outline-none focus:border-indigo-500">
-                    <button onclick="joinRoom()" class="p-4 bg-white/10 rounded-xl hover:bg-white/20"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- WAITING SCREEN -->
-    <div id="waiting-screen" class="screen flex-col items-center gap-8 text-center">
-        <div class="w-24 h-24 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-        <div class="glass p-8 rounded-[2.5rem] border-indigo-500/30">
-            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Room ID</p>
-            <h2 id="display-room-id" class="text-5xl font-black tracking-widest font-mono">0000</h2>
-        </div>
-        <button onclick="showHome()" class="text-slate-500 font-bold uppercase text-xs tracking-widest underline underline-offset-8">Cancel</button>
-    </div>
-
-    <!-- GAME SCREEN -->
-    <div id="game-screen" class="screen w-full max-w-sm flex-col gap-8">
-        <div class="flex justify-between items-center glass p-4 rounded-[2rem]">
-            <button onclick="showHome()" class="text-slate-500"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
-            <div class="text-center">
-                <p id="turn-status" class="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Player X Turn</p>
-                <p id="room-tag" class="text-[8px] font-bold text-slate-600 uppercase">Local Match</p>
-            </div>
-            <button onclick="resetBoard()" class="text-slate-500"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
-        </div>
-
-        <div id="board" class="glass p-4 rounded-[3rem] aspect-square grid grid-cols-3 gap-3">
-            <!-- 9 Cells generated by JS -->
-        </div>
-    </div>
-
-    <script>
-        // --- Firebase Init ---
-        const config = JSON.parse(__firebase_config);
-        firebase.initializeApp(config);
-        const db = firebase.firestore();
-        const auth = firebase.auth();
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-fmk';
-
-        let user = null;
-        let gameMode = 'local'; // 'local' or 'online'
-        let roomID = null;
-        let boardState = Array(9).fill(null);
-        let currentPlayer = 'X';
-        let winner = null;
-        let unsubscribe = null;
-
-        // --- Auth Setup ---
-        async function initAuth() {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await auth.signInWithCustomToken(__initial_auth_token);
-            } else {
-                await auth.signInAnonymously();
-            }
-            user = auth.currentUser;
-        }
-
-        // --- Navigation ---
-        function switchScreen(id) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-        }
-
-        function showHome() { 
-            if (unsubscribe) unsubscribe();
-            switchScreen('home-screen'); 
-        }
-        function showLobby() { switchScreen('lobby-screen'); }
-
-        // --- Game Logic ---
-        function createBoard() {
-            const boardEl = document.getElementById('board');
-            boardEl.innerHTML = '';
-            boardState.forEach((val, i) => {
-                const cell = document.createElement('button');
-                cell.className = 'cell rounded-[1.5rem] flex items-center justify-center text-4xl font-black';
-                if (val === 'X') cell.innerHTML = '<span class="text-indigo-500">X</span>';
-                if (val === 'O') cell.innerHTML = '<span class="text-pink-500">O</span>';
-                cell.onclick = () => handleMove(i);
-                boardEl.appendChild(cell);
-            });
-        }
-
-        function checkWinner(b) {
-            const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-            for (let [a,b1,c] of lines) {
-                if (b[a] && b[a] === b[b1] && b[a] === b[c]) return b[a];
-            }
-            return b.every(v => v) ? 'draw' : null;
-        }
-
-        async function handleMove(i) {
-            if (boardState[i] || winner) return;
-
-            if (gameMode === 'online') {
-                const snap = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(roomID).get();
-                const data = snap.data();
-                const mySymbol = data.players.X === user.uid ? 'X' : 'O';
-                if (data.currentPlayer !== mySymbol) return;
-            }
-
-            boardState[i] = currentPlayer;
-            winner = checkWinner(boardState);
-            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
-
-            if (gameMode === 'online') {
-                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(roomID).update({
-                    board: boardState,
-                    currentPlayer: currentPlayer,
-                    winner: winner
-                });
-            } else {
-                updateUI();
-            }
-        }
-
-        function updateUI() {
-            createBoard();
-            const status = document.getElementById('turn-status');
-            if (winner) {
-                status.innerText = winner === 'draw' ? "IT'S A DRAW!" : `PLAYER ${winner} WINS!`;
-                status.classList.add('text-amber-400');
-            } else {
-                status.innerText = `Player ${currentPlayer} Turn`;
-                status.classList.remove('text-amber-400');
-            }
-        }
-
-        function resetBoard() {
-            boardState = Array(9).fill(null);
-            currentPlayer = 'X';
-            winner = null;
-            if (gameMode === 'online') {
-                db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(roomID).update({
-                    board: boardState, currentPlayer: 'X', winner: null
-                });
-            } else {
-                updateUI();
-            }
-        }
-
-        // --- Network Actions ---
-        function startLocal() {
-            gameMode = 'local';
-            document.getElementById('room-tag').innerText = 'Local Match';
-            resetBoard();
-            switchScreen('game-screen');
-        }
-
-        async function createRoom() {
-            gameMode = 'online';
-            roomID = Math.floor(1000 + Math.random() * 9000).toString();
-            document.getElementById('display-room-id').innerText = roomID;
-            document.getElementById('room-tag').innerText = `Room: ${roomID}`;
-            
-            await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(roomID).set({
-                board: Array(9).fill(null),
-                currentPlayer: 'X',
-                winner: null,
-                players: { X: user.uid, O: null },
-                status: 'waiting'
-            });
-
-            switchScreen('waiting-screen');
-            listenToRoom();
-        }
-
-        async function joinRoom() {
-            const id = document.getElementById('join-input').value;
-            if (!id) return;
-            const ref = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(id);
-            const snap = await ref.get();
-            
-            if (snap.exists() && !snap.data().players.O) {
-                gameMode = 'online';
-                roomID = id;
-                document.getElementById('room-tag').innerText = `Room: ${id}`;
-                await ref.update({ 'players.O': user.uid, status: 'playing' });
-                switchScreen('game-screen');
-                listenToRoom();
-            }
-        }
-
-        function listenToRoom() {
-            if (unsubscribe) unsubscribe();
-            unsubscribe = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('rooms').doc(roomID)
-                .onSnapshot(snap => {
-                    if (!snap.exists()) return;
-                    const data = snap.data();
-                    boardState = data.board;
-                    currentPlayer = data.currentPlayer;
-                    winner = data.winner;
-                    
-                    if (data.status === 'playing' && document.getElementById('waiting-screen').classList.contains('active')) {
-                        switchScreen('game-screen');
-                    }
-                    updateUI();
-                });
-        }
-
-        // --- Boot ---
-        window.onload = async () => {
-            await initAuth();
-            setTimeout(() => {
-                switchScreen('home-screen');
-            }, 2500);
-        };
+        window.onload = initAuth;
     </script>
 </body>
 </html>
