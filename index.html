@@ -3,11 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tic-Tac-Toe Pro | FMK</title>
+    <title>FMK ULTRA | P2P</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Inter:wght@400;700&display=swap');
         
+        :root {
+            --x-color: #6366f1;
+            --o-color: #ec4899;
+        }
+
         body {
             font-family: 'Inter', sans-serif;
             background: #020617;
@@ -21,117 +27,271 @@
             touch-action: manipulation;
         }
 
-        h1, h2 { font-family: 'Orbitron', sans-serif; }
+        h1, h2, #room-display { font-family: 'Orbitron', sans-serif; }
 
-        .neo-card {
+        .neo-box {
             background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(10px);
+            backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 2rem;
+            border-radius: 24px;
         }
 
-        .tic-cell {
+        .cell {
             background: #0f172a;
-            border-bottom: 5px solid #000;
-            border-radius: 1.2rem;
+            border-bottom: 4px solid #000;
+            border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 3rem;
+            font-size: 2.5rem;
             font-weight: 900;
             aspect-ratio: 1/1;
             transition: 0.1s;
         }
 
-        .tic-cell:active { border-bottom-width: 0; transform: translateY(4px); }
+        .cell:active { border-bottom-width: 0; transform: translateY(4px); }
 
-        .x-glow { color: #6366f1; text-shadow: 0 0 15px #6366f1; }
-        .o-glow { color: #ec4899; text-shadow: 0 0 15px #ec4899; }
+        .x-text { color: var(--x-color); text-shadow: 0 0 15px var(--x-color); }
+        .o-text { color: var(--o-color); text-shadow: 0 0 15px var(--o-color); }
 
         .screen {
             display: none;
             width: 100%;
-            max-width: 400px;
+            max-width: 380px;
             flex-direction: column;
-            padding: 24px;
+            padding: 20px;
         }
 
-        .screen.active { display: flex; }
+        .screen.active { display: flex; animation: slideUp 0.3s ease-out; }
 
-        .btn-action {
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .btn-main {
             background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
-            border-radius: 1.5rem;
-            transition: 0.2s;
+            box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3);
+            border-radius: 18px;
         }
-        .btn-action:active { transform: scale(0.95); }
-
-        /* Tactical decorative lines */
-        .scanline {
-            width: 100%;
-            height: 2px;
-            background: rgba(99, 102, 241, 0.1);
-            position: absolute;
-            top: 0;
-            animation: moveScan 4s linear infinite;
-        }
-        @keyframes moveScan { from { top: 0; } to { top: 100%; } }
     </style>
 </head>
 <body>
-    <div class="scanline"></div>
 
-    <!-- MAIN MENU -->
-    <div id="menu" class="screen active gap-5">
-        <div class="text-center mb-8">
-            <h1 class="text-4xl font-black italic x-glow tracking-tighter">BATTLE HUB</h1>
-            <p class="text-[10px] tracking-[0.4em] text-indigo-400 uppercase font-bold mt-1">Tactical Combat Unit</p>
-        </div>
-        
-        <div class="flex flex-col gap-4">
-            <button onclick="startGame('pvp')" class="neo-card p-6 flex items-center gap-5 active:bg-white/10">
-                <div class="w-12 h-12 bg-indigo-500/20 rounded-xl flex items-center justify-center text-2xl">⚔️</div>
-                <div class="text-left">
-                    <h3 class="font-bold text-lg">Local 1v1</h3>
-                    <p class="text-[10px] text-slate-500 uppercase font-bold">Pass & Play</p>
-                </div>
-            </button>
-
-            <button onclick="startGame('pve')" class="neo-card p-6 flex items-center gap-5 active:bg-white/10">
-                <div class="w-12 h-12 bg-pink-500/20 rounded-xl flex items-center justify-center text-2xl">🤖</div>
-                <div class="text-left">
-                    <h3 class="font-bold text-lg">Vs CPU</h3>
-                    <p class="text-[10px] text-slate-500 uppercase font-bold">Training Mode</p>
-                </div>
-            </button>
-
-            <div class="neo-card p-4 text-center opacity-40">
-                <p class="text-[9px] text-slate-500 uppercase font-bold">Online Mode Locked</p>
-                <p class="text-[8px] text-slate-600 mt-1">Requires Firebase Hosting</p>
-            </div>
-        </div>
-
-        <p class="text-[9px] text-center text-slate-700 uppercase mt-10 font-bold tracking-widest">FMK PRO V3.0 • OFFLINE EDITION</p>
+    <!-- LOADING SCREEN (AUTO-HIDES IN 3 SECS) -->
+    <div id="loader-screen" class="fixed inset-0 z-50 bg-[#020617] flex flex-col items-center justify-center">
+        <div class="w-16 h-16 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-4"></div>
+        <h1 class="text-xl font-black italic tracking-widest text-indigo-500">FMK ULTRA</h1>
+        <p class="text-[10px] text-slate-500 mt-2 uppercase tracking-[0.3em]">Initializing P2P Systems</p>
     </div>
 
-    <!-- GAME BOARD -->
-    <div id="game" class="screen gap-5">
-        <div class="flex justify-between items-center neo-card p-4">
-            <div class="flex flex-col">
-                <p id="turn-text" class="text-xs font-black x-glow uppercase tracking-widest">Turn: X</p>
-                <p id="mode-tag" class="text-[9px] text-slate-500 font-bold uppercase">Mode: PvP</p>
-            </div>
-            <div class="flex gap-2">
-                <button onclick="resetGame()" class="p-2 bg-white/5 rounded-lg">
-                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                </button>
-                <button onclick="switchScreen('menu')" class="p-2 bg-white/5 rounded-lg">
-                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
-                </button>
-            </div>
+    <!-- MAIN MENU -->
+    <div id="menu" class="screen gap-4">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-black italic x-text">BATTLE HUB</h1>
+            <p class="text-[9px] tracking-[0.4em] text-slate-500 font-bold uppercase">Online & Local Combat</p>
         </div>
 
-        <div id="board" class="grid grid-cols-3 gap-4 aspect-square neo-card p-4">
-            <!-- Cells generated by JS -->
+        <button onclick="startLocal()" class="neo-box p-6 flex items-center gap-5 active:bg-white/5">
+            <div class="w-12 h-12 bg-slate-800 rounded-2xl flex items-center justify-center text-xl">⚔️</div>
+            <div class="text-left">
+                <h3 class="font-bold">Offline 1v1</h3>
+                <p class="text-[10px] text-slate-500">Play on this phone</p>
+            </div>
+        </button>
+
+        <button onclick="showLobby()" class="btn-main p-6 flex items-center gap-5 active:scale-95 transition-all">
+            <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-xl">🌐</div>
+            <div class="text-left">
+                <h3 class="font-bold">Online P2P</h3>
+                <p class="text-[10px] text-indigo-200">Connect via Code</p>
+            </div>
+        </button>
+    </div>
+
+    <!-- LOBBY -->
+    <div id="lobby" class="screen gap-6">
+        <button onclick="showMenu()" class="text-xs font-bold text-slate-500">← EXIT TO MENU</button>
+        <div class="neo-box p-6 space-y-8">
+            <div class="text-center">
+                <p class="text-[10px] text-indigo-400 font-bold mb-2">YOUR CODE</p>
+                <h2 id="my-peer-id" class="text-4xl font-black tracking-widest">----</h2>
+                <p class="text-[9px] text-slate-500 mt-2">Give this to your friend</p>
+            </div>
+            
+            <div class="border-t border-white/5 pt-6">
+                <p class="text-[10px] text-slate-400 mb-2 font-bold uppercase">Enter Friend's Code</p>
+                <div class="flex gap-2">
+                    <input id="friend-id-input" type="number" placeholder="0000" class="flex-1 bg-black/50 border border-white/10 rounded-xl px-4 text-center font-bold text-xl outline-none h-14">
+                    <button onclick="connectToFriend()" class="px-6 btn-main font-bold">JOIN</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- GAME -->
+    <div id="game" class="screen gap-4">
+        <div class="flex justify-between items-center neo-box p-4">
+            <div>
+                <p id="turn-display" class="text-xs font-black x-text uppercase">X Turn</p>
+                <p id="role-display" class="text-[9px] text-slate-500 uppercase">Local Mode</p>
+            </div>
+            <button onclick="requestReset()" class="p-2 bg-white/5 rounded-xl">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            </button>
+        </div>
+
+        <div id="grid" class="grid grid-cols-3 gap-3 aspect-square neo-box p-3"></div>
+
+        <div class="grid grid-cols-3 gap-2">
+            <div class="neo-box py-3 text-center"><p class="text-[8px] text-slate-500">X</p><p id="sx" class="font-black x-text">0</p></div>
+            <div class="neo-box py-3 text-center"><p class="text-[8px] text-slate-500">DRAW</p><p id="sd" class="font-black">0</p></div>
+            <div class="neo-box py-3 text-center"><p class="text-[8px] text-slate-500">O</p><p id="so" class="font-black o-text">0</p></div>
+        </div>
+    </div>
+
+    <script>
+        let peer, connection;
+        let myRole = 'X'; // X for host, O for joiner
+        let gameMode = 'local';
+        let board = Array(9).fill(null);
+        let turn = 'X';
+        let winner = null;
+        let scores = { X: 0, O: 0, draw: 0 };
+
+        // INITIALIZE PEERJS
+        function initPeer() {
+            const randomId = Math.floor(1000 + Math.random() * 8999).toString();
+            peer = new Peer(randomId);
+
+            peer.on('open', id => {
+                document.getElementById('my-peer-id').innerText = id;
+            });
+
+            // Incoming Connection
+            peer.on('connection', conn => {
+                connection = conn;
+                myRole = 'X';
+                gameMode = 'online';
+                setupMessaging();
+                showGame("ONLINE: X (YOU)");
+            });
+        }
+
+        function connectToFriend() {
+            const id = document.getElementById('friend-id-input').value;
+            if(!id) return;
+            connection = peer.connect(id);
+            myRole = 'O';
+            gameMode = 'online';
+            setupMessaging();
+            showGame("ONLINE: O (YOU)");
+        }
+
+        function setupMessaging() {
+            connection.on('data', data => {
+                if(data.type === 'move') {
+                    board = data.board;
+                    turn = data.turn;
+                    winner = data.winner;
+                    if(winner) scores[winner === 'draw' ? 'draw' : winner]++;
+                    updateUI();
+                } else if(data.type === 'reset') {
+                    resetLogic();
+                }
+            });
+            connection.on('open', () => console.log("Link Established"));
+        }
+
+        // GAME LOGIC
+        function makeMove(i) {
+            if (board[i] || winner) return;
+            if (gameMode === 'online' && turn !== myRole) return;
+
+            board[i] = turn;
+            winner = checkWin(board);
+            const next = turn === 'X' ? 'O' : 'X';
+
+            if (gameMode === 'online') {
+                connection.send({ type: 'move', board, turn: next, winner });
+            }
+
+            if(winner) scores[winner === 'draw' ? 'draw' : winner]++;
+            turn = next;
+            updateUI();
+        }
+
+        function checkWin(b) {
+            const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+            for (let [a,b1,c] of lines) if (b[a] && b[a] === b[b1] && b[a] === b[c]) return b[a];
+            return b.every(v => v) ? 'draw' : null;
+        }
+
+        function requestReset() {
+            resetLogic();
+            if(gameMode === 'online' && connection) connection.send({ type: 'reset' });
+        }
+
+        function resetLogic() {
+            board = Array(9).fill(null);
+            turn = 'X';
+            winner = null;
+            updateUI();
+        }
+
+        function updateUI() {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
+            board.forEach((val, i) => {
+                const btn = document.createElement('button');
+                btn.className = 'cell';
+                if(val) btn.innerHTML = `<span class="${val==='X'?'x-text':'o-text'}">${val}</span>`;
+                btn.onclick = () => makeMove(i);
+                grid.appendChild(btn);
+            });
+
+            const status = document.getElementById('turn-display');
+            if(winner) {
+                status.innerText = winner === 'draw' ? "DRAW!" : `${winner} WINS!`;
+                status.className = `text-xs font-black uppercase ${winner==='X'?'x-text':'o-text'}`;
+            } else {
+                status.innerText = (gameMode === 'online' && turn !== myRole) ? "WAITING..." : `${turn} TURN`;
+                status.className = `text-xs font-black uppercase ${turn==='X'?'x-text':'o-text'}`;
+            }
+
+            document.getElementById('sx').innerText = scores.X;
+            document.getElementById('so').innerText = scores.O;
+            document.getElementById('sd').innerText = scores.draw;
+        }
+
+        // NAVIGATION
+        function showMenu() { switchScreen('menu'); }
+        function showLobby() { switchScreen('lobby'); }
+        function startLocal() { gameMode = 'local'; showGame("Local 1v1"); }
+        function showGame(tag) { 
+            document.getElementById('role-display').innerText = tag;
+            resetLogic();
+            switchScreen('game'); 
+        }
+
+        function switchScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        window.onload = () => {
+            initPeer();
+            updateUI();
+            // 3-second force load for mobile
+            setTimeout(() => {
+                document.getElementById('loader-screen').style.display = 'none';
+                showMenu();
+            }, 3000);
+        };
+    </script>
+</body>
+</html>
+
         </div>
 
         <div class="grid grid-cols-3 gap-3">
